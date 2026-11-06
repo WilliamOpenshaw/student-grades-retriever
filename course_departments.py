@@ -47,11 +47,11 @@ RULES = [
     ('Homeroom', r'home\s?room'),
     ('PBL', r'\bpbl|project based learning'),
     ('PHE', r'\bpe\b|\bphe\b|physical education|health|yoga|darts|wellbeing'),
-    ('Modern Languages', r'chinese|mandarin|\bcsl\b|interpret|中文|華語'),
+    ('Modern Languages', r'chinese|mandarin|spanish|french|german|japanese|korean|\blatin\b|\bcsl\b|interpret|中文|華語'),
     # Ontario course codes in older names (2024F ENG3U, ENG4U-C1(EWC4U)) count too.
     ('English / EAL', r'\besl|\benl|\beal\b|english|\bela\b|lang(uage)?\s*\d|literature|writing|ielts|'
                       r'lit circle|\blanguage\b|\b(eng|ewc|ets|olc)\d|\beng\b'),   # 'Eng-1': JH archive
-    ('Mathematics', r'math|mth1w|functions|calculus|data management|differential|statistic|'
+    ('Mathematics', r'math|mth1w|algebra|geometry|trigonometry|functions|calculus|data management|differential|statistic|'
                     r'\b(mpm|mcr|mhf|mcv|mdm)\d'),
     ('Social Sciences', r'social|history|geograph|sociology|psychology|anthropolog|economic|entrepreneur|'
                         r'philosoph|government|politic|relationship|life design|career|logic|\bss\b|'
@@ -110,21 +110,9 @@ def suggest(name):
 
 
 def _jh_code(key, dept):
-    """Middle-grades codes used in the departmental Sheet (Math6, SciTech7, Geo8, Arts6 Strand D...)."""
-    m = re.search(r'(?<!\d)([5-8])(?!\d)', key)
-    if not m:
-        return ''
-    g = m.group(1)
-    if dept == 'Mathematics' and not re.search(r'mth1w|sec', key, re.I):
-        return 'Math' + g
-    if dept == 'Natural Sciences':
-        return 'SciTech' + g
-    if dept == 'Social Sciences':
-        return 'SocStudy' + g if g in '56' else 'Geo' + g
-    if dept == 'Art & Design':
-        return 'Arts' + g + ' Strand D'
-    if dept == 'Modern Languages':
-        return '108 stage 2'
+    """Optional: a course code for middle-grade courses that have none in ONTARIO_CODES, worked out
+    from the grade number in the course key and the department (e.g. 'Math' + grade). Returns ''
+    by default; add your school's scheme here if you use one."""
     return ''
 
 

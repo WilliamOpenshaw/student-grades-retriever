@@ -13,6 +13,12 @@ keeps dated snapshots in a local **SQLite** database, and produces:
 
 Windows-oriented (batch files, Task Scheduler), but the Python scripts run anywhere.
 
+[![Demo video: the monthly scripts, a grade report and the staff dashboard](docs/demo-poster.jpg)](docs/demo.mp4)
+
+[Watch the 77-second demo](docs/demo.mp4) (no sound). It shows the monthly scripts running, one grade
+report, and the staff dashboard. Everything in it is made-up demo data (see "Try it with made-up data"
+below).
+
 > **Student data stays on your computer.** The database, reports, logs and CSVs are all git-ignored.
 > Never commit `.env`, `credentials.json` or `token_*.json`.
 
@@ -66,6 +72,16 @@ The full run-book, with every option, is [INSTRUCTIONS.txt](INSTRUCTIONS.txt). I
 `send_emails_hs.py` / `send_emails_jh.py` send **real email** without `--preview` or `--test`.
 Always run `--preview` (lists who gets what, never connects) and `--test` (sends everything to the
 sender's own inbox) first.
+
+## Try it with made-up data
+
+`tools/demo/make_demo_data.py` creates `demo_output\demo_grades.db`: an invented school with 74
+students, two semesters and three grade pulls (random names, `example.edu` emails). With it you can
+run the grade calculation, the reports, the email script in `--preview` mode and a local copy of
+the dashboard without any Google account. The steps are in the script's docstring.
+
+The demo video is recorded from that data with `node tools/demo/record-demo.js` (needs Node 22+,
+Chrome or Edge, and ffmpeg).
 
 ## Staff dashboard
 

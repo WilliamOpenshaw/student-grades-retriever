@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Terminal</title>
+<!-- Used only by record-demo.js: replays commands and the output they really printed when the
+     recorder ran them on the made-up demo database (demo_output/terminal.json). -->
+<style>
+  html, body { margin: 0; height: 100%; background: #16181c; }
+  #t { box-sizing: border-box; height: 100%; padding: 26px 34px 26px; overflow: hidden;
+       font: 17px/1.45 Consolas, "Cascadia Mono", monospace; color: #d7dae0; white-space: pre-wrap; }
+  .cmd { color: #ffffff; }
+  .ps { color: #8fb6e8; }
+  .dim { color: #8b9099; }
+</style>
+</head>
+<body>
+<div id="t"></div>
+<script>
+const t = document.getElementById('t');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+// steps: [{cmd, out: [lines], pause}]
+window.play = async (steps, typeMs = 22, lineMs = 40) => {
+  t.innerHTML = '';
+  for (const s of steps) {
+    if (s.clear) t.innerHTML = '';
+    const line = document.createElement('div');
+    line.innerHTML = '<span class="ps">PS&gt; </span><span class="cmd"></span>';
+    t.appendChild(line);
+    const c = line.querySelector('.cmd');
+    for (const ch of s.cmd) { c.textContent += ch; await sleep(typeMs); }
+    await sleep(350);
+    for (const o of s.out) {
+      const d = document.createElement('div');
+      d.innerHTML = o.startsWith('...') ? '<span class="dim">' + esc(o) + '</span>' : esc(o);
+      t.appendChild(d);
+      while (t.scrollHeight > t.clientHeight && t.firstChild) t.firstChild.remove();
+      await sleep(lineMs);
+    }
+    await sleep(s.pause || 900);
+  }
+};
+</script>
+</body>
+</html>

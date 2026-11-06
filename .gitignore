@@ -45,6 +45,9 @@ dist/
 *.spec
 .idea/
 .vscode/
-.claude/settings.local.json
+.claude/
 .DS_Store
 Thumbs.db
+
+# Made-up demo data (tools/demo/make_demo_data.py)
+demo_output/
