@@ -13,11 +13,11 @@ keeps dated snapshots in a local **SQLite** database, and produces:
 
 Windows-oriented (batch files, Task Scheduler), but the Python scripts run anywhere.
 
-[![Demo video: the monthly scripts, a grade report and the staff dashboard](docs/demo-poster.jpg)](docs/demo.mp4)
+https://github.com/user-attachments/assets/3e93a6f9-67d9-4e3f-9577-a7909064ee87
 
-[Watch the 77-second demo](docs/demo.mp4) (no sound). It shows the monthly scripts running, one grade
-report, and the staff dashboard. Everything in it is made-up demo data (see "Try it with made-up data"
-below).
+77-second demo (no sound): the monthly scripts running, one grade report, and the staff dashboard.
+Everything in it is made-up demo data (see "Try it with made-up data" below). If the player doesn't
+show, [open the video file](docs/demo.mp4).
 
 > **Student data stays on your computer.** The database, reports, logs and CSVs are all git-ignored.
 > Never commit `.env`, `credentials.json` or `token_*.json`.
