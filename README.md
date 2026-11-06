@@ -99,3 +99,7 @@ them into the database.
 This project processes student names, emails and grades. Keep the database, `grade_reports\`,
 `logs\`, `backups\` and any CSV exports on a trusted computer, follow your school's data-protection
 rules, and don't paste student data into external services.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
