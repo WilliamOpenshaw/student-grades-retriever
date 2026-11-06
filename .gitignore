@@ -1,0 +1,50 @@
+# ---- Secrets: NEVER commit these ----
+.env
+credentials.json
+token_*.json
+client_secret*.json
+*.pem
+drive_config.json
+
+# ---- Student data and anything generated from it ----
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+backups/
+grade_reports/
+logs/
+email logs/
+nightly_log.txt
+class_grades_log.csv
+student_list_csvs/*
+!student_list_csvs/README.md
+department_analysis_past_grades_csvs/
+dashboard_web_app/local_test/out/
+archive_export/Classroom grade export*/
+archive_export/*.zip
+*.zip
+report_exclusions.txt
+selected_students.txt
+email_preview_list.txt
+refresh_request.json
+refresh_status.json
+refresh_heartbeat.json
+
+# School logo (add your own locally)
+report_logo.png
+
+# ---- Python / tooling ----
+.venv/
+venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+.idea/
+.vscode/
+.claude/settings.local.json
+.DS_Store
+Thumbs.db

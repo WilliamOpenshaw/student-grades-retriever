@@ -1,0 +1,206 @@
+DATABASE: All scripts use the local SQLite file grades.db in this folder (set by DB_PATH in .env).
+It is created on first use. Open it with any SQLite tool (DataGrip, DB Browser for SQLite...). Backups: see step 11.
+First-time setup (Google Cloud project, .env, student list format): see README.md.
+
+EACH NEW SEMESTER (before step 2): export the HS and JH "Student List" tabs as CSV into student_list_csvs\ and run
+  python import_student_lists.py --hs "student_list_csvs\<HS file>.csv" --jh "student_list_csvs\<JH file>.csv"
+It backs up the database, saves each CSV as its own table (student_list_hs_<year>_<season>, student_list_jh_<year>_<season>),
+adds the current students to Student_Name_List_HS / student_name_list_jh for that semester, and carries returning
+students' Google Classroom IDs forward. Use --dry-run first to preview. New students are linked by steps 3 and 4.
+
+EACH NEW SEMESTER: accept all the new class invitations at once (instead of clicking Accept in each class):
+  .venv\Scripts\python.exe accept_classroom_invitations.py --dry-run     (lists pending invitations)
+  .venv\Scripts\python.exe accept_classroom_invitations.py               (accepts them all)
+First run opens a browser login per school; sign in with the matching school account.
+
+EACH NEW SEMESTER (after the first sync of the semester): the staff dashboard's "Departments" tab (in the
+"Dashboard Access" Sheet) gets a row for every new course, with a suggested department, the night after the
+sync. Ask the dean to check the new rows (Note column shows the date added). To see the suggestions for all
+course names without changing anything:
+  .venv\Scripts\python.exe course_departments.py --check
+
+DEPARTMENT AVERAGES: the staff dashboard's Departments tab shows department averages from Classroom data, with one
+column per grade sync, so run the grade sync (steps 2-5) at least once a month.
+
+PAST GRADES FROM OLD (ARCHIVED) CLASSROOM CLASSES: any Google account that can see old classes can export them with
+the Apps Script in archive_export\ (steps for that person: archive_export\README.md; nothing to install, read-only).
+Bring the downloaded zip file(s) to this computer and run:
+  .venv\Scripts\python.exe import_archive_export.py "<export zip>" --dry-run      (summary, writes nothing)
+  .venv\Scripts\python.exe import_archive_export.py "<export zip>"                (backs up grades.db, then imports)
+If the dry run lists classes with HS or JH "Unknown" (old classes whose students aren't in this database) and the
+exporting account only has one school's classes, add  --default-section "High School"  (or "Junior High").
+Test/example classes and this semester's classes are skipped automatically.
+HS/JH is decided by the students' section that semester, then the class name; the summary line
+"HS/JH decided by" shows how many classes each rule decided.
+Final grades are calculated the same way as the grade reports. Importing the same class again replaces it.
+The zip contains student names and grades: delete it (and the Drive folder) once imported.
+After an import, run the checks below, then the dashboard sync (or wait for tonight's) so the Past grades tab
+shows the archive:
+  .venv\Scripts\python.exe sync_dashboard.py
+
+CHECKING PAST GRADES (optional, read-only; results in logs\archive_compare_<date>_*.csv):
+  .venv\Scripts\python.exe compare_archived_grades.py
+Compares other grade sources you may have (a dept_monthly_class_averages table, a "Grade Category Trial Pull" CSV
+export in department_analysis_past_grades_csvs\, a student_transcripts table) with Classroom data. Sources that
+don't exist are skipped. The output contains student names: keep it on this computer.
+
+NOTE: run scripts with .venv\Scripts\python.exe (or activate the venv first). Plain "python" is the
+system Python, which doesn't have the Google packages installed.
+
+Google Classroom Grade Sync: Recommended Execution Order
+
+Step	Script Name	Purpose
+1	authenticate.py
+Initial Setup: Generates or refreshes OAuth2 tokens for both High School and Junior High accounts with the correct permission scopes.
+
+2	ingest_classroom_data.py
+Data Fetching: The primary engine that pulls assignment grades and submissions from Google Classroom and saves them as snapshots in the database.
+
+Controls for ingest_classroom_date
+New arguments:
+
+--school
+Already existed — limits to one section
+--school "Junior High"
+
+--course
+Exact course name match
+--course "English 10 - Period 2"
+
+--course-filter
+One or more keywords (case-insensitive, OR logic)
+--course-filter English literature
+
+Usage examples:
+# Only Junior High
+python ingest_classroom_data.py --school "Junior High"
+
+# One specific course
+python ingest_classroom_data.py --course "English 10 - Period 2"
+
+# All courses with "English" OR "literature" in the name
+python ingest_classroom_data.py --course-filter English literature
+
+# Combine with student filter
+python ingest_classroom_data.py -s "Jane Smith" --course-filter English
+
+SELECTED STUDENTS (ingest, grade reports, email scripts all accept the same options):
+  --student "Sam Taylor"            repeat for more students
+  --students-file selected_students.txt   one name per line; "G9 " in front and anything in brackets
+                                          like "(李小明) (H)" are ignored, so a list from the Sheet works as-is
+A student-filtered ingest only reads those students' classes (faster for a few students, about the same
+as a full pull when they are spread across many classes) and copies every other student's latest grades
+into the same snapshot, so reports and the dashboard still see the whole school.
+Example - redo reports for a list of students:
+  .venv\Scripts\python.exe ingest_classroom_data.py --school "High School" --students-file selected_students.txt
+  .venv\Scripts\python.exe enrich_student_records_HS.py
+  .venv\Scripts\python.exe calculate_category_grades.py
+  .venv\Scripts\python.exe generate_grade_reports.py --school HS --students-file selected_students.txt
+     (writes grade_reports\<date>_<time>_HS_SELECTED\ and prints the audit / send commands for it)
+  .venv\Scripts\python.exe send_emails_hs.py --folder <that folder> --preview   then --test, then the real send
+
+CURRENT-SEMESTER CHECK (ingest + grade reports):
+Classroom keeps old classes "active" until a teacher archives them, so the scripts also read the semester
+from the course name (26S, 25F, Spring '26, 25-26 Spring, 2025-2026 AP ... = year-long) and:
+  * EXCLUDE active courses named for a past semester (e.g. "2024F Makerspace" during Spring 2026).
+    Use --include-old-courses on ingest_classroom_data.py to keep them anyway.
+  * KEEP courses with no semester in the name, but list them so you can check them.
+  * WARN if a school has no classes for the current semester, or has unaccepted Classroom invitations
+    (run accept_classroom_invitations.py), and, in generate_grade_reports.py, if the latest data is
+    from an earlier semester or looks like a partial (filtered) run.
+All of this is printed and also saved to logs\course_term_check.log. Read it after each ingest.
+
+OVERALL-GRADE VISIBILITY CHECK (ingest + grade reports):
+If a teacher's Classroom class is set to "No overall grade", the parent report shows "This Class is Not Graded" (本課程不計成績) for that
+class even when work has been graded. Classes set to show the overall grade to "teachers only" DO get their
+grade on the report (decided 2026-10-13), although students can't see it in Classroom; they're listed as a note.
+Ingest and generate_grade_reports.py list both (with student and grade counts) and save the list to
+logs\grade_visibility_check.log. They also list GRADED WORK THAT DOESN'T COUNT: in a "Weighted by category" class,
+assignments left in "No category" (or in a 0% category) are graded but ignored in the overall grade, in Classroom
+too; if all graded work is like that, the class has no overall grade ("No Grade Yet"). The list names the class,
+how much work is affected and example assignment titles, so the teacher can move them into a weighted category. Ask the teacher to change the setting if it isn't intended, then re-run
+ingest, enrich and calculate. Two ways to check any time (add --school HS or --school JH for one school):
+  .venv\Scripts\python.exe grade_visibility_classroom.py   settings in Google Classroom RIGHT NOW, and which classes
+                                                          changed since the last ingest (re-ingest if any changed)
+  .venv\Scripts\python.exe grade_visibility_db.py          settings as of the last ingest = what the reports will use
+Grade reports use the latest snapshot for EACH school, so HS and JH can be fetched on different days.
+
+3	enrich_student_records_HS.py
+HS Enrichment: Syncs student emails and links the raw Classroom data to the official High School student name list using fuzzy matching.
+
+4	enrich_student_records_JH.py
+JH Enrichment: Performs the same linking and email sync for Junior High students, targeting the specific JH name list table.
+
+5	calculate_category_grades.py
+Grade Processing: Calculates the weighted percentage scores for specific grading categories (e.g., Tests, Homework) across all students. Afterwards it automatically updates the teacher dashboard (add --no-dashboard to skip, e.g. for tests).
+
+6	verify_category_calculations.py
+Audit (read-only): recalculates EVERY category grade and overall grade (each course's Classroom setting) for every
+grade pull and compares them with the stored values. Ends with "Everything matches" or lists the problems.
+Add --latest to check only each school's latest pull (a few seconds).
+
+7	generate_grade_reports.py
+Report Generation: Pulls the finalized data from the database and builds individual, secure HTML grade reports for every student.
+Skips anyone listed in report_exclusions.txt (e.g. teacher placeholder accounts); audit and email scripts also refuse to send to them. Honors "(H)" students DO get reports (since 2026-10-12; EXCLUDE_HONORS_STUDENTS in report_exclusions.py switches the old rule back on).
+Each run writes to its own folder, grade_reports\<date>_<time>_<HS|JH|ALL>\ (runs for selected students, --student / --students-file, end in _SELECTED), with a manifest.json saying which school each report is for. Earlier runs are kept untouched.
+audit_emails.py and send_emails_hs.py / send_emails_jh.py automatically use the newest folder for their school (an ALL folder counts for both; each email script only sends its own school's reports from it) and print the folder name. Use --folder <folder name> to pick a different run. _SELECTED (and older _TEST) folders are never picked automatically - send them with --folder <folder name>.
+
+8	audit_emails.py
+Pre-Flight Check: Scans the generated HTML reports and compares them against the database to detect any missing parent emails or spelling typos before sending.
+
+9	send_emails_jh.py
+Distribution: Extracts parent and student emails from the HTML reports, generates a bilingual instruction email, and sends the reports via the school's Gmail server.
+
+10	view_tables.py
+Maintenance: A utility script to quickly view the contents of any table in the local database (grades.db) from the command line.
+
+11	backup_database.py
+Backup: Zips a safe copy of grades.db into the local backups folder and uploads it to Google Drive (Student Grades Retriever/Database Backups).
+
+12	sync_dashboard.py
+Staff Dashboard: Uploads the latest snapshot, the grade history (trends) and course analytics as JSON files to Google Drive for the Apps Script dashboard used by teachers, the dean and the well-being team. Run after step 5 (step 5 does it automatically).
+Opening the dashboard needs the person's email in the "Dashboard Access" Sheet AND the current access code, which changes every week and is emailed to you and everyone with role dean or wellbeing in the Sheet (teachers get it from you). If a code leaks, run changeCodeNow in Apps Script.
+
+Daily: run_backup_and_sync.bat runs step 11, then refresh_dashboard.py, which reads current grades from Classroom into the live_grades table (overwritten each time, never a snapshot) and runs step 12. It is scheduled in Windows Task Scheduler as "Student Grades - Backup and Dashboard Sync" (daily 3:40 PM; runs at next startup if the PC was off). It doesn't affect grade reports or emails: for those, keep running steps 1-9, which make the permanent monthly snapshots.
+Dashboard "Update grades" button: runs the same update while this PC is on, through dashboard_watcher.py (Task Scheduler: "Student Grades - Dashboard Button Watcher", no window). Logs: logs\dashboard_watcher.log, logs\dashboard_refresh.log.
+By hand: .venv\Scripts\python.exe refresh_dashboard.py   (add --no-upload to skip Drive, --compare to compare with the latest snapshot)
+Setup steps for backups and the dashboard: dashboard_web_app\SETUP.md
+
+
+Detailed Script Descriptions
+
+1. authenticate.py
+What it does: This script ensures your local machine has the valid "tokens" (permissions) to talk to Google's servers.
+Why it's first: Other scripts will fail with "Authentication Errors" if these tokens are missing or expired.
+
+2. ingest_classroom_data.py
+What it does: The "heavy lifter" of the project. It scans for "Homeroom" courses to guess student grade levels, then iterates through every assignment in every active course to record grades.
+Post-processing: It includes a step to backfill "Unknown" grade levels by looking for clues in course names (like "PBL" or "Year 10").
+
+3. enrich_student_records_HS.py & 4. enrich_student_records_JH.py
+What they do: These scripts clean up the data. They fetch the actual email addresses for students (which are not always available during the initial ingest) and link the "Classroom User ID" to an "Official Student ID" from your school's name list.
+Fuzzy Matching: They use a matching algorithm to link names even if they aren't spelled exactly the same (e.g., "John Smith" vs. "Smith, John").
+
+5. calculate_category_grades.py
+What it does: It adds a new column (student_grade_in_category) to your snapshot table and performs a SQL-based calculation: (Sum of Assigned Scores / Sum of Max Points) * 100.
+Granularity: Calculations are performed per student, per course, and per category.
+
+6. verify_category_calculations.py
+What it does: Acts as a "sanity check." It picks a random student with multiple assignments and compares the database-stored grade against a fresh manual calculation.
+
+7. generate_grade_reports.py
+What it does: Queries the database for the most recent snapshot and creates a beautiful, dynamic HTML file for each student.
+Features: You can run it with `--school JH` or `--school HS` to only generate reports for a specific division, or use `--student "John Doe"` to generate a single report for testing. Output is saved to the `./grade_reports/` folder.
+
+8. audit_emails.py
+What it does: A critical safety net before emailing parents. It opens every generated HTML file, reads the emails embedded inside, and cross-references them with your database to ensure nobody is missing and no email addresses have typos.
+
+9. send_emails_jh.py
+What it does: The final distribution script. It loops through the `./grade_reports/` folder, drafts a bilingual (Traditional Chinese / English) email, attaches the HTML report, and sends it out. It also automatically calculates the "Previous Month" for the subject line.
+Safety Features:
+  * Run with `--preview` to print a list of who will receive what without connecting to the email server.
+  * Run with `--test` to process everything normally but route ALL emails to your own inbox for final visual verification.
+  * Resending to a few students: `--student "Casey Wong"` (repeatable) or `--students-file selected_students.txt` sends only for those students (if any of them has no report in the folder, nothing is sent and the missing names are listed). Add `--to someone@example.com` (one student only) to send the parent email to a different address instead of the ones on file, or `--parents-only` to skip the student's copy. Always try it with `--preview` first.
+
+10. view_tables.py
+What it does: A simple interactive tool. When run, it lists all available tables in the local database and allows you to view the raw data directly in your terminal.

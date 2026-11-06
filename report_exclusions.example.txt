@@ -1,0 +1,6 @@
+# Copy to report_exclusions.txt (git-ignored) and list people who should NOT get a grade report.
+#
+# One entry per line: a Classroom email, a Google Classroom user ID, or a full name as it
+# appears in Classroom. Text after '#' is a comment and is shown as the reason.
+
+placeholder.teacher@yourschool.edu   # teacher placeholder account in Homeroom 5

@@ -1,0 +1,2310 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<script>
+  // Before the page draws, so a saved choice doesn't flash the other colours. No choice = follow the computer.
+  try { var t = localStorage.getItem('dash_theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+</script>
+<meta charset="utf-8">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f3f5f8; --card: #ffffff; --text: #111827; --muted: #5b6472; --faint: #8a919c; --border: #e2e6ec;
+    --accent: #1e3a8a; --accent-soft: #e5ebfb; --row-hover: #f6f8fb;
+    --good: #0f7b0f; --good-bg: #dcfce7; --warn: #a45a06; --warn-bg: #fef3c7;
+    --bad: #b91c1c; --bad-bg: #fee2e2; --none: #737373; --none-bg: #eef1f5;
+    --grid: #e6e8ec; --axis: #c3c2b7;
+    --series-1: #2a78d6; --series-2: #eb6834;
+    --st-critical: #d03b3b; --st-serious: #ec835a; --st-warning: #fab219; --st-good: #0ca30c;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05);
+    /* Letter-grade ramp A..F (one hue, dark = A in light mode; checked with the dataviz ordinal validator) */
+    --dist-0: #0d366b; --dist-1: #214a80; --dist-2: #345f95; --dist-3: #4874ab; --dist-4: #5c89c1; --dist-5: #719fd8; --dist-6: #86b6ef;
+    --dist-ink-0: #fff; --dist-ink-1: #fff; --dist-ink-2: #fff; --dist-ink-3: #fff; --dist-ink-4: #111827; --dist-ink-5: #111827; --dist-ink-6: #111827;
+    --dist-prev: #86b6ef;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0f1115; --card: #1a1c21; --text: #f2f3f5; --muted: #b4b9c2; --faint: #858b95; --border: #2c3038;
+      --accent: #93b4f5; --accent-soft: #1f2d4f; --row-hover: #22252c;
+      --good: #4ade80; --good-bg: #133d24; --warn: #fbbf24; --warn-bg: #4a3410;
+      --bad: #f87171; --bad-bg: #4c1a1a; --none: #a3a3a3; --none-bg: #2a2d34;
+      --grid: #2c2c2a; --axis: #45474d;
+      --series-1: #3987e5; --series-2: #d95926;
+      --shadow: none;
+      --dist-0: #e3eefc; --dist-1: #c3d8f3; --dist-2: #a4c2e9; --dist-3: #86ace0; --dist-4: #6796d5; --dist-5: #4880ca; --dist-6: #256abf;
+      --dist-ink-0: #0f1115; --dist-ink-1: #0f1115; --dist-ink-2: #0f1115; --dist-ink-3: #0f1115; --dist-ink-4: #0f1115; --dist-ink-5: #0f1115; --dist-ink-6: #fff;
+      --dist-prev: #1c5cab;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1115; --card: #1a1c21; --text: #f2f3f5; --muted: #b4b9c2; --faint: #858b95; --border: #2c3038;
+    --accent: #93b4f5; --accent-soft: #1f2d4f; --row-hover: #22252c;
+    --good: #4ade80; --good-bg: #133d24; --warn: #fbbf24; --warn-bg: #4a3410;
+    --bad: #f87171; --bad-bg: #4c1a1a; --none: #a3a3a3; --none-bg: #2a2d34;
+    --grid: #2c2c2a; --axis: #45474d;
+    --series-1: #3987e5; --series-2: #d95926;
+    --shadow: none;
+    --dist-0: #e3eefc; --dist-1: #c3d8f3; --dist-2: #a4c2e9; --dist-3: #86ace0; --dist-4: #6796d5; --dist-5: #4880ca; --dist-6: #256abf;
+    --dist-ink-0: #0f1115; --dist-ink-1: #0f1115; --dist-ink-2: #0f1115; --dist-ink-3: #0f1115; --dist-ink-4: #0f1115; --dist-ink-5: #0f1115; --dist-ink-6: #fff;
+    --dist-prev: #1c5cab;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, input, select { font: inherit; color: inherit; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+  .top { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; justify-content: space-between; padding: 10px 0 6px; }
+  h1 { font-size: 17px; margin: 0; color: var(--accent); }
+  .sub { color: var(--muted); font-size: 12px; }
+  .who { display: flex; gap: 10px; align-items: center; }
+  nav.tabs { display: flex; gap: 2px; overflow-x: auto; }
+  nav.tabs button { background: none; border: none; border-bottom: 2px solid transparent; padding: 8px 12px;
+                    cursor: pointer; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  nav.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--card); border-color: var(--accent); font-weight: 600; }
+  main { padding: 16px 0 40px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .toolbar input, .toolbar select { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+  .toolbar input { flex: 1 1 220px; min-width: 0; }
+  button.link { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; text-align: left; }
+  button.link:hover { text-decoration: underline; }
+  .crumbs { margin-bottom: 10px; font-size: 13px; }
+  h2 { font-size: 19px; margin: 0 0 2px; }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+  .panel + .panel, .cols + .panel, .panel + .cols, .cols + .cols, .tiles + .cols, .tiles + .panel { margin-top: 14px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .panel-head h3 { margin: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0 0; }
+  .tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); }
+  .tile .label { font-size: 12px; color: var(--muted); }
+  .tile .value { font-size: 24px; font-weight: 650; line-height: 1.25; }
+  .tile .note { font-size: 12px; color: var(--faint); }
+  button.tile { text-align: left; cursor: pointer; }
+  button.tile:hover { border-color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; cursor: pointer;
+          text-align: left; width: 100%; box-shadow: var(--shadow); }
+  .card:hover, .card:focus-visible { border-color: var(--accent); outline: none; }
+  .card-title { font-weight: 600; margin-bottom: 6px; overflow-wrap: anywhere; }
+  .card-stats { display: flex; gap: 6px 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); align-items: center; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+  td.wrap { white-space: normal; min-width: 200px; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; user-select: none; position: sticky; top: 0; background: var(--card); }
+  th[data-sort] { cursor: pointer; }
+  th.num, td.num { text-align: right; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.click { cursor: pointer; }
+  tbody tr.click:hover { background: var(--row-hover); }
+  .pill { display: inline-block; min-width: 54px; text-align: center; border-radius: 999px; padding: 1px 8px; font-weight: 600; font-size: 12px; }
+  .g-good { color: var(--good); background: var(--good-bg); }
+  .g-warn { color: var(--warn); background: var(--warn-bg); }
+  .g-bad  { color: var(--bad);  background: var(--bad-bg); }
+  .g-none { color: var(--none); background: var(--none-bg); }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; }
+  .status i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .status.s-int i { background: var(--st-critical); } .status.s-att i { background: var(--st-warning); }
+  .status.s-ok i { background: var(--st-good); }
+  .status.s-int::after { content: ""; }
+  .delta { font-size: 12px; font-weight: 600; }
+  .delta.down { color: var(--bad); } .delta.up { color: var(--good); } .delta.flat { color: var(--muted); }
+  .tag { font-size: 11px; border-radius: 4px; padding: 0 5px; margin-left: 4px; background: var(--none-bg); color: var(--muted); }
+  .tag.late { background: var(--warn-bg); color: var(--warn); }
+  .tag.missing { background: var(--bad-bg); color: var(--bad); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .chip { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+  .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .reasons { color: var(--muted); font-size: 12px; white-space: normal; min-width: 220px; }
+  .cat { display: grid; grid-template-columns: minmax(110px, 1fr) 2fr auto; gap: 10px; align-items: center; margin: 7px 0; font-size: 13px; }
+  .bar { height: 8px; background: var(--none-bg); border-radius: 4px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 4px; background: var(--series-1); }
+  .course-block { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+  .course-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+  .msg { text-align: center; color: var(--muted); padding: 40px 16px; }
+  .error { color: var(--bad); }
+  .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent);
+             border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* charts */
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart text { fill: var(--faint); font-size: 11px; font-family: inherit; }
+  .chart .gridline { stroke: var(--grid); stroke-width: 1; }
+  .chart .baseline { stroke: var(--axis); stroke-width: 1; }
+  .chart .ref { stroke: var(--st-critical); stroke-width: 1; opacity: .5; }
+  .chart .crosshair { stroke: var(--axis); stroke-width: 1; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  #tip { position: fixed; z-index: 20; pointer-events: none; background: var(--card); color: var(--text); border: 1px solid var(--border);
+         border-radius: 8px; padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.15); display: none; max-width: 260px; }
+  #tip b { display: block; margin-bottom: 2px; }
+  .dist-note { color: var(--muted); font-size: 12px; margin: -2px 0 8px; }
+  .dist-body { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  .dist-body .chart { flex: 0 0 auto; width: 190px; margin: 0 auto; }
+  .dist-body .table-wrap { flex: 1 1 440px; }
+  .dist-body td, .dist-body th { padding: 4px 8px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .chips.small { margin: 0; gap: 4px; }
+  .chips.small .chip { padding: 2px 10px; font-size: 12px; }
+  .spark { vertical-align: middle; }
+  .spark polyline { fill: none; stroke: var(--series-1); stroke-width: 1.5; }
+  .spark circle { fill: var(--series-1); }
+  /* lock screen */
+  .lock { max-width: 380px; margin: 10vh auto 0; padding: 24px; }
+  .lock h2 { margin-bottom: 6px; }
+  .lock input { width: 100%; font-size: 22px; letter-spacing: .25em; text-transform: uppercase; text-align: center;
+                padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); margin: 14px 0 10px; }
+  .lock .btn { width: 100%; padding: 10px; }
+  dialog.update { border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text);
+                  width: min(560px, calc(100vw - 32px)); padding: 18px 20px; }
+  dialog.update::backdrop { background: rgba(0, 0, 0, .45); }
+  dialog.update h2 { margin-bottom: 8px; }
+  dialog.update ul { margin: 6px 0 10px; padding-left: 18px; font-size: 13px; }
+  dialog.update li { margin: 3px 0; }
+  .up-computer { font-size: 13px; font-weight: 600; margin: 8px 0; }
+  .up-computer i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: var(--faint); }
+  .up-computer.on i { background: var(--st-good); } .up-computer.off i { background: var(--st-critical); }
+  .up-bar { height: 10px; border-radius: 5px; background: var(--none-bg); overflow: hidden; margin: 10px 0 4px; }
+  .up-bar > div { height: 100%; width: 0; background: var(--series-1); transition: width .4s; }
+  .up-stage { font-size: 13px; min-height: 18px; }
+  dialog.update textarea { width: 100%; height: 110px; margin-top: 8px; resize: vertical; font: 12px/1.4 ui-monospace, Consolas, monospace;
+                           color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+  .up-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .rules { font-size: 12px; color: var(--muted); }
+  .rules b { color: var(--text); }
+  .rules ul { margin: 4px 0 8px; padding-left: 18px; }
+  .dist-table th { white-space: normal; vertical-align: bottom; }
+  .dept-table tfoot th { position: static; color: var(--text); border-top: 2px solid var(--border); border-bottom: none; }
+  .dept-table td.wrap { min-width: 160px; }
+  .who .btn { white-space: nowrap; }
+  @media (max-width: 640px) {
+    .who { flex-wrap: wrap; }
+    .dist-table .rng { display: none; }
+    header { position: static; }
+    th { position: static; }
+  }
+  @media print {
+    header nav, .toolbar, .who button, #tip { display: none !important; }
+    header { position: static; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>Student Grades Dashboard</h1>
+        <div class="sub" id="meta">Read-only · data from the school grades database</div>
+      </div>
+      <div class="who">
+        <div class="who" id="who"></div>
+        <button class="btn" id="theme-btn" type="button"></button>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist" hidden>
+      <button role="tab" data-tab="overview">Overview</button>
+      <button role="tab" data-tab="watch">Watch list</button>
+      <button role="tab" data-tab="courses">Courses</button>
+      <button role="tab" data-tab="depts">Departments</button>
+      <button role="tab" data-tab="students">Students</button>
+      <button role="tab" data-tab="past">Past grades</button>
+      <button role="tab" data-tab="about">How it works</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <div class="toolbar" id="toolbar" hidden>
+    <input id="search" type="search" placeholder="Search students or courses…" aria-label="Search">
+    <select id="f-section" aria-label="Section"><option value="">All sections</option></select>
+    <select id="f-grade" aria-label="Grade level"><option value="">All grade levels</option></select>
+    <select id="f-homeroom" aria-label="Homeroom"><option value="">All homerooms</option></select>
+    <select id="f-dept" aria-label="Department"><option value="">All departments</option></select>
+  </div>
+  <div id="view"><div class="msg"><div class="spinner"></div>Loading…</div></div>
+</main>
+<div id="tip" role="tooltip"></div>
+<dialog class="update" id="update-dialog" aria-labelledby="up-title">
+  <h2 id="up-title">Update grades from Google Classroom</h2>
+  <div class="sub">
+    Asks the school's grades computer to read the latest grades from Google Classroom and send them to this dashboard.
+    Everyone who uses the dashboard then sees the new grades.
+  </div>
+  <ul>
+    <li><b>How long:</b> about 10 minutes. You can close this box and keep working; the Update button shows the progress.</li>
+    <li><b>It works when:</b> the grades computer is on, awake and online. The light below shows this.</li>
+    <li><b>It can't work when:</b> that computer is off or asleep, or the grades were updated in the last 10 minutes.</li>
+    <li><b>Automatic update:</b> every day at about 3:40 PM if the computer is on, so you often won't need this button.</li>
+    <li><b>It covers:</b> all classes the school's High School and Junior High Classroom accounts can see, not your account.</li>
+    <li><b>It won't:</b> change anything in Classroom, send any email, or change the grade reports for parents.</li>
+  </ul>
+  <div class="up-computer" id="up-computer"><i></i>Checking the grades computer…</div>
+  <div class="up-bar" role="progressbar" aria-label="Update progress" aria-valuemin="0" aria-valuemax="100"><div id="up-bar"></div></div>
+  <div class="up-stage" id="up-stage" aria-live="polite"></div>
+  <textarea id="up-log" readonly aria-label="Update stages" placeholder="The stages of the update will appear here."></textarea>
+  <div class="up-actions">
+    <button class="btn" id="up-close" type="button">Close</button>
+    <button class="btn primary" id="up-start" type="button" title="Ask the grades computer to update the dashboard now">Update now</button>
+  </div>
+</dialog>
+
+<script>
+/* =====================================================================
+   State
+   ===================================================================== */
+var R = { section: 0, grade: 1, semester: 2, sid: 3, name: 4, email: 5, course: 6, overall: 7,
+          late: 8, count: 9, missing: 10, display: 11, graded: 12 };
+var IDLE_MINUTES = 30;   // lock the page after this long without activity
+var S = {
+  code: null, session: null, data: null,
+  students: {}, courses: {}, studentList: [], courseList: [],
+  tab: 'overview', page: null,          // page: {type: 'course'|'student', id}
+  back: [],                             // stack of previous pages
+  sort: {}, watchFilter: 'all', groupBy: 'grade',
+  courseDetail: {}, studentDetail: {},
+  showDetail: true,                     // assignment-level detail; off by default for the well-being team
+  distMode: pref('distMode', 'bars', ['bars', 'donut']),             // grade distribution: bars or proportions
+  distUnit: pref('distUnit', 'students', ['students', 'classes']),   // student course grades or class averages
+  past: null, pastSid: null, pastDetail: {},                        // Past grades tab (loaded after unlock)
+  deptSem: null,                                                    // department report: semester shown (null = current)
+  deptCols: pref('deptCols', 'month', ['month', 'update']),          // department page: one column per month or per update
+  deptCombine: pref('deptCombine', 'no', ['no', 'yes']) === 'yes',   // department page: sections of a course as one row
+  flagScope: pref('flagScope', 'dept', ['dept', 'all'])              // with a department picked: flags from its courses or all courses
+};
+/** Per-viewer chart preferences (this browser only; the page works without them). */
+function pref(key, fallback, allowed) {
+  try { var v = localStorage.getItem('dash_' + key); return allowed.indexOf(v) !== -1 ? v : fallback; } catch (e) { return fallback; }
+}
+function savePref(key, value) { try { localStorage.setItem('dash_' + key, value); } catch (e) {} }
+
+/* =====================================================================
+   Helpers
+   ===================================================================== */
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+// Same bands and letters as the emailed grade reports.
+function band(p) { return p == null ? 'g-none' : p >= 70 ? 'g-good' : p > 50 ? 'g-warn' : 'g-bad'; }
+var LETTERS = ['A', 'AB', 'B', 'BC', 'C', 'D', 'F'];
+function letter(p) {
+  if (p == null) return '';
+  return p >= 85 ? 'A' : p >= 80 ? 'AB' : p >= 75 ? 'B' : p >= 70 ? 'BC' : p >= 60 ? 'C' : p >= 50 ? 'D' : 'F';
+}
+function fmt(p, d) { return p == null ? '—' : p.toFixed(d == null ? 1 : d); }
+function pill(p, hiddenNote) {
+  if (p == null) return '<span class="pill g-none" title="' + esc(hiddenNote || 'No overall grade') + '">—</span>';
+  return '<span class="pill ' + band(p) + '">' + p.toFixed(1) + '% ' + letter(p) + '</span>';
+}
+/** Course grade pill, tagged when it has too few graded assignments to count yet. */
+function coursePill(c) {
+  var p = pill(c.grade, c.display === 'HIDE_OVERALL_GRADE' ? 'No overall grade in Classroom' : '');
+  if (c.grade != null && !c.counts) {
+    p += '<span class="tag" title="Only ' + c.graded + ' graded assignment' + (c.graded === 1 ? '' : 's') +
+         ': not counted in averages or flags yet">few grades</span>';
+  }
+  return p;
+}
+function mean(list) {
+  var v = list.filter(function (x) { return x != null && !isNaN(x); });
+  return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+}
+function median(list) {
+  var v = list.filter(function (x) { return x != null; }).sort(function (a, b) { return a - b; });
+  if (!v.length) return null;
+  var m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+function sum(list) { return list.reduce(function (a, b) { return a + (b || 0); }, 0); }
+function uniq(list) { return list.filter(function (x, i) { return x && list.indexOf(x) === i; }); }
+function natural(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }); }
+function delta(d, title) {
+  if (d == null) return '<span class="delta flat">—</span>';
+  var cls = d <= -0.5 ? 'down' : d >= 0.5 ? 'up' : 'flat';
+  var arrow = cls === 'down' ? '▼ ' : cls === 'up' ? '▲ ' : '';
+  return '<span class="delta ' + cls + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + arrow +
+         (d > 0 ? '+' : '') + d.toFixed(1) + '</span>';
+}
+var STATUS = {
+  intervention: { cls: 's-int', label: 'Needs intervention', rank: 0 },
+  attention:    { cls: 's-att', label: 'Needs attention', rank: 1 },
+  ok:           { cls: 's-ok',  label: 'On track', rank: 2 }
+};
+function statusBadge(st) { var s = STATUS[st]; return '<span class="status ' + s.cls + '"><i></i>' + s.label + '</span>'; }
+function shortDay(d) { // '2026-10-05' -> 'Oct 5'
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+  if (!m) return d;
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m[2] - 1] + ' ' + (+m[3]);
+}
+function call(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+    runner[fn].apply(runner, [S.code].concat(args));
+  });
+}
+function handleError(err) {
+  var msg = (err && err.message) || String(err);
+  if (msg.indexOf('ACCESS_CODE:') !== -1) return lock(msg.split('ACCESS_CODE:')[1].trim());
+  $('view').innerHTML = '<div class="msg error">' + esc(msg) + '</div>';
+}
+
+/* =====================================================================
+   Lock screen and idle lock
+   ===================================================================== */
+function storedCode() { try { return sessionStorage.getItem('dash_code'); } catch (e) { return null; } }
+function storeCode(c) { try { c ? sessionStorage.setItem('dash_code', c) : sessionStorage.removeItem('dash_code'); } catch (e) {} }
+
+function lock(message) {
+  S.code = null; S.data = null; S.session = null; S.courseDetail = {}; S.studentDetail = {};
+  S.past = null; S.pastSid = null; S.pastDetail = {};
+  storeCode(null);
+  stopUpdatePolling(); U.waiting = false; U.last = null;
+  if ($('update-dialog').open) $('update-dialog').close();
+  $('tabs').hidden = true; $('toolbar').hidden = true; $('who').innerHTML = '';
+  $('view').innerHTML =
+    '<form class="panel lock" id="lock-form" autocomplete="off">' +
+    '<h2>Enter access code</h2>' +
+    '<div class="sub">This dashboard shows student grades. Enter the current access code from the dashboard owner. ' +
+    'The code changes regularly; you will be asked again after ' + IDLE_MINUTES + ' minutes without activity or when you close this tab.</div>' +
+    '<input id="code" inputmode="text" maxlength="12" aria-label="Access code" autofocus>' +
+    (message ? '<div class="error" style="font-size:13px;margin-bottom:10px">' + esc(message) + '</div>' : '') +
+    '<button class="btn primary" type="submit">Open dashboard</button></form>';
+  $('lock-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    unlockWith($('code').value);
+  });
+  setTimeout(function () { var c = $('code'); if (c) c.focus(); }, 50);
+}
+
+function unlockWith(code) {
+  S.code = String(code || '').trim().toUpperCase();
+  $('view').innerHTML = '<div class="msg"><div class="spinner"></div>Checking code and loading grades…</div>';
+  call('unlock').then(function (session) {
+    S.session = session;
+    storeCode(S.code);
+    return call('getDashboardData');
+  }).then(function (data) {
+    S.data = data;
+    prepare(data);
+    startApp();
+    loadPast();
+  }).catch(handleError);
+}
+
+var idleTimer = null;
+function resetIdle() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(function () { if (S.code) lock('Locked after ' + IDLE_MINUTES + ' minutes without activity.'); },
+                         IDLE_MINUTES * 60000);
+}
+['click', 'keydown', 'scroll', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, resetIdle, { passive: true }); });
+
+/* =====================================================================
+   Derived data: students, courses, trends, status
+   ===================================================================== */
+function prepare(data) {
+  var H = data.history, rules = data.rules;
+  var students = {}, courses = {};
+
+  data.rows.forEach(function (r) {
+    var sid = r[R.sid];
+    var st = students[sid] || (students[sid] = {
+      id: sid, name: r[R.name], email: r[R.email], section: r[R.section], grade: r[R.grade] || 'Unknown',
+      semester: r[R.semester], homeroom: data.homerooms[sid] || '', courses: []
+    });
+    var c = { course: r[R.course], grade: r[R.overall], late: r[R.late] || 0, missing: r[R.missing] || 0,
+              count: r[R.count] || 0, display: r[R.display] || '', trend: [],
+              graded: r[R.graded] == null ? 99 : r[R.graded] };
+    c.counts = c.grade != null && c.graded >= (data.rules.minGraded || 0);
+    st.courses.push(c);
+    var co = courses[r[R.course]] || (courses[r[R.course]] = {
+      name: r[R.course], section: r[R.section], semester: r[R.semester], rows: [], timeline: []
+    });
+    co.rows.push({ st: st, c: c });
+  });
+
+  // Trend points of the current semester, per student-course.
+  var byKey = {};
+  H.trend.forEach(function (t) {
+    var key = t[0] + '\u0001' + H.courses[t[1]];
+    (byKey[key] = byKey[key] || []).push({ day: H.dates[t[2]], g: t[3] });
+  });
+  // Final grades of earlier semesters, per student.
+  var past = {};
+  H.past.forEach(function (p) {
+    var bySem = past[p[0]] || (past[p[0]] = {});
+    (bySem[p[1]] = bySem[p[1]] || []).push({ course: H.courses[p[2]], g: p[3] });
+  });
+  // Class averages on every snapshot day (current semester only for the course page).
+  H.timeline.forEach(function (t) {
+    var co = courses[H.courses[t[2]]];
+    if (co && t[1] === co.semester) co.timeline.push({ day: t[3], avg: t[4], n: t[5], below: t[6] });
+  });
+  // Every class of every semester with its average on each update day (department report).
+  var series = {};
+  H.timeline.forEach(function (t) {
+    var name = H.courses[t[2]];
+    if (!name) return;
+    var bySem = series[t[1]] || (series[t[1]] = {});
+    var cs = bySem[name] || (bySem[name] = { name: name, section: t[0], semester: t[1], pts: [] });
+    cs.pts.push({ day: t[3], avg: t[4], n: t[5], below: t[6] });
+  });
+  Object.keys(series).forEach(function (sem) {
+    Object.keys(series[sem]).forEach(function (n) { series[sem][n].pts.sort(function (a, b) { return natural(a.day, b.day); }); });
+  });
+  S.series = series;
+
+  var draftOf = {};
+  (data.drafts || []).forEach(function (d) { draftOf[d[0] + '\u0001' + d[1]] = d[2]; });
+  Object.keys(students).forEach(function (sid) {
+    var st = students[sid];
+    st.courses.forEach(function (c) { c.drafts = draftOf[sid + '\u0001' + c.course] || 0; });
+    st.courses.sort(function (a, b) { return natural(a.course, b.course); });
+    st.courses.forEach(function (c) {
+      c.trend = (byKey[sid + '\u0001' + c.course] || []).sort(function (a, b) { return natural(a.day, b.day); });
+      c.delta = null;
+      if (c.trend.length >= 2 && c.counts) {
+        var prev = c.trend[c.trend.length - 2].g;
+        if (prev != null) c.delta = c.grade - prev;
+      }
+    });
+    // Earlier semesters.
+    st.past = Object.keys(past[sid] || {}).sort(semesterOrder).map(function (sem) {
+      var list = past[sid][sem];
+      return { semester: sem, avg: mean(list.map(function (x) { return x.g; })), courses: list };
+    });
+    summarize(st);
+    evaluate(st, rules);
+  });
+
+  Object.keys(courses).forEach(function (name) {
+    var co = courses[name];
+    var grades = co.rows.map(function (x) { return x.c.grade; });
+    co.n = co.rows.length;
+    co.avg = mean(grades);
+    co.median = median(grades);
+    co.below60 = grades.filter(function (g) { return g != null && g < 60; }).length;
+    co.missing = sum(co.rows.map(function (x) { return x.c.missing; }));
+    co.late = sum(co.rows.map(function (x) { return x.c.late; }));
+    co.drafts = sum(co.rows.map(function (x) { return x.c.drafts; }));
+    co.hidden = grades.every(function (g) { return g == null; });
+    co.grades = uniq(co.rows.map(function (x) { return x.st.grade; })).sort(natural);
+    co.timeline.sort(function (a, b) { return natural(a.day, b.day); });
+    co.deltas = co.rows.map(function (x) { return x.c.delta; }).filter(function (d) { return d != null; });
+    var ci = courseInfo(name);
+    co.dept = ci.dept; co.code = ci.code; co.leaveOut = ci.leaveOut; co.deptSuggested = ci.suggested;
+  });
+  scopedCache = {};
+
+  S.students = students; S.courses = courses;
+  S.studentList = Object.keys(students).map(function (k) { return students[k]; })
+    .sort(function (a, b) { return natural(a.name, b.name); });
+  S.courseList = Object.keys(courses).map(function (k) { return courses[k]; })
+    .sort(function (a, b) { return natural(a.name, b.name); });
+}
+
+/** Averages, missing work and changes of a student from st.courses / st.past (all courses or one department). */
+function summarize(st) {
+  var graded = st.courses.filter(function (c) { return c.counts; });
+  st.avg = mean(graded.map(function (c) { return c.grade; }));
+  st.missing = sum(st.courses.map(function (c) { return c.missing; }));
+  st.late = sum(st.courses.map(function (c) { return c.late; }));
+  st.drafts = sum(st.courses.map(function (c) { return c.drafts; }));
+  st.below60 = graded.filter(function (c) { return c.grade < 60; }).length;
+  st.lowest = graded.slice().sort(function (a, b) { return a.grade - b.grade; })[0] || null;
+  // Change since the previous update, comparing the same courses on both days.
+  var pairs = st.courses.filter(function (c) { return c.delta != null; });
+  st.deltaUpdate = pairs.length ? mean(pairs.map(function (c) { return c.grade; })) -
+                                  mean(pairs.map(function (c) { return c.grade - c.delta; })) : null;
+  var last = st.past.length ? st.past[st.past.length - 1] : null;
+  st.lastSem = last;
+  st.deltaSem = last && last.avg != null && st.avg != null ? st.avg - last.avg : null;
+}
+
+/* Departments (from the Departments tab of the access Sheet, else the suggestion from the sync). */
+var DEPT_ORDER = ['English / EAL', 'Mathematics', 'Natural Sciences', 'Social Sciences', 'Modern Languages',
+                  'Art & Design', 'PHE', 'PBL', 'Homeroom', 'Other', 'Unassigned'];
+function courseInfo(name) { return (S.data.courseInfo || {})[name] || { dept: 'Unassigned', code: '', key: name, leaveOut: false, suggested: true }; }
+function deptOf(name) { return courseInfo(name).dept; }
+function deptOrder(a, b) {
+  var i = DEPT_ORDER.indexOf(a), j = DEPT_ORDER.indexOf(b);
+  return (i === -1 ? 99 : i) - (j === -1 ? 99 : j) || natural(a, b);
+}
+/**
+ * The student seen through one department: only its courses count. The support status (flags and
+ * reasons) is either the student's overall one, or, with "Flags from: <department> only", the same
+ * rules run on just this department's courses (for heads of department).
+ */
+var scopedCache = {};
+function scoped(st, dept) {
+  var k = dept + '\u0001' + S.flagScope + '\u0001' + st.id;
+  if (scopedCache[k]) return scopedCache[k];
+  var s = Object.create(st);
+  s.courses = st.courses.filter(function (c) { return deptOf(c.course) === dept; });
+  s.past = st.past.map(function (ps) {
+    var list = ps.courses.filter(function (c) { return deptOf(c.course) === dept; });
+    return { semester: ps.semester, avg: mean(list.map(function (x) { return x.g; })), courses: list };
+  }).filter(function (ps) { return ps.courses.length; });
+  summarize(s);
+  if (S.flagScope === 'dept') evaluate(s, S.data.rules);   // sets s.status / s.reasons / s.declining
+  return (scopedCache[k] = s);
+}
+
+function semesterOrder(a, b) {
+  var key = function (s) { var m = /(\d{4})\s+(Spring|Fall)/i.exec(s || ''); return m ? +m[1] * 2 + (/fall/i.test(m[2]) ? 1 : 0) : 0; };
+  return key(a) - key(b);
+}
+
+/** Support status with plain-language reasons (rules come from Code.gs). */
+function evaluate(st, rules) {
+  var I = rules.intervention, A = rules.attention;
+  var graded = st.courses.filter(function (c) { return c.counts; });
+  var names = function (list) { return list.map(function (c) { return shortCourse(c.course) + ' ' + c.grade.toFixed(0); }).join(', '); };
+  var iR = [], aR = [];
+  var f = graded.filter(function (c) { return c.grade < I.courseBelow; });
+  if (f.length) iR.push('Below ' + I.courseBelow + ': ' + names(f));
+  var two = graded.filter(function (c) { return c.grade < I.twoCoursesBelow; });
+  if (two.length >= 2) iR.push(two.length + ' courses below ' + I.twoCoursesBelow);
+  if (st.avg != null && st.avg < I.averageBelow) iR.push('Average ' + st.avg.toFixed(1));
+  if (st.missing >= I.missingAtLeast) iR.push(st.missing + ' missing assignments');
+
+  var low = graded.filter(function (c) { return c.grade < A.courseBelow && c.grade >= I.courseBelow; });
+  if (low.length && two.length < 2) aR.push('Below ' + A.courseBelow + ': ' + names(low));
+  if (st.avg != null && st.avg >= I.averageBelow && st.avg < A.averageBelow) aR.push('Average ' + st.avg.toFixed(1));
+  if (st.missing >= A.missingAtLeast && st.missing < I.missingAtLeast) aR.push(st.missing + ' missing assignments');
+  st.declining = false;
+  if (st.deltaUpdate != null && st.deltaUpdate <= -A.dropAtLeast) {
+    aR.push('Dropped ' + Math.abs(st.deltaUpdate).toFixed(1) + ' since last update'); st.declining = true;
+  }
+  if (st.deltaSem != null && st.deltaSem <= -A.dropAtLeast) {
+    aR.push('Down ' + Math.abs(st.deltaSem).toFixed(1) + ' vs ' + st.lastSem.semester); st.declining = true;
+  }
+  st.status = iR.length ? 'intervention' : aR.length ? 'attention' : 'ok';
+  st.reasons = iR.concat(aR);
+}
+
+function shortCourse(name) {
+  return String(name).replace(/^\s*(\d{2}(\d{2})?\s*[FS]|\d{2}-\d{2}\s+(Fall|Spring)|(Fall|Spring)\s+'?\d{2})\s+/i, '');
+}
+
+/* =====================================================================
+   Filters
+   ===================================================================== */
+function filters() {
+  return { q: $('search').value.trim().toLowerCase(), section: $('f-section').value,
+           grade: $('f-grade').value, homeroom: $('f-homeroom').value, dept: $('f-dept').value };
+}
+function studentMatches(st, f, ignoreSearch) {
+  return (!f.section || st.section === f.section) && (!f.grade || st.grade === f.grade) &&
+         (!f.homeroom || st.homeroom === f.homeroom) &&
+         (!f.dept || st.courses.some(function (c) { return deptOf(c.course) === f.dept; })) &&
+         (ignoreSearch || !f.q || st.name.toLowerCase().indexOf(f.q) !== -1 || st.email.toLowerCase().indexOf(f.q) !== -1);
+}
+/** Students matching the filters; with a department picked, seen through that department's courses. */
+function filteredStudents(ignoreSearch) {
+  var f = filters();
+  var list = S.studentList.filter(function (st) { return studentMatches(st, f, ignoreSearch); });
+  return f.dept ? list.map(function (st) { return scoped(st, f.dept); }) : list;
+}
+function filteredCourses() {
+  var f = filters();
+  return S.courseList.filter(function (co) {
+    if (f.dept && co.dept !== f.dept) return false;
+    if (f.section && co.section !== f.section) return false;
+    if (f.grade && co.grades.indexOf(f.grade) === -1) return false;
+    if (f.homeroom && !co.rows.some(function (x) { return x.st.homeroom === f.homeroom; })) return false;
+    return !f.q || co.name.toLowerCase().indexOf(f.q) !== -1;
+  });
+}
+function fillSelect(id, values, keep) {
+  var sel = $(id), cur = sel.value, first = sel.options[0];
+  sel.innerHTML = ''; sel.add(first);
+  values.forEach(function (v) { sel.add(new Option(v, v)); });
+  sel.value = keep && values.indexOf(cur) !== -1 ? cur : '';
+}
+function refreshFilterOptions() {
+  var sec = $('f-section').value, gr = $('f-grade').value;
+  var pool = S.studentList.filter(function (s) { return !sec || s.section === sec; });
+  fillSelect('f-grade', uniq(pool.map(function (s) { return s.grade; })).sort(natural), true);
+  gr = $('f-grade').value;
+  pool = pool.filter(function (s) { return !gr || s.grade === gr; });
+  var hrs = uniq(pool.map(function (s) { return s.homeroom; })).sort(natural);
+  fillSelect('f-homeroom', hrs, true);
+  $('f-homeroom').hidden = !hrs.length;
+  var depts = uniq(S.courseList.filter(function (co) { return !sec || co.section === sec; })
+    .map(function (co) { return co.dept; })).sort(deptOrder);
+  fillSelect('f-dept', depts, true);
+  $('f-dept').hidden = depts.length < 2 && !$('f-dept').value;
+}
+
+/* =====================================================================
+   Charts (inline SVG, no libraries)
+   ===================================================================== */
+var tip = $('tip');
+function showTip(html, x, y) {
+  tip.innerHTML = html; tip.style.display = 'block';
+  var w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x + 14)) + 'px';
+  tip.style.top = Math.max(8, y - h - 12) + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+
+/**
+ * Line chart with categorical x (evenly spaced points), one shared y axis in percent.
+ * opts: { labels: [..], sublabels: [..], maxLabels (default 8), series: [{ name, color, values: [num|null], notes: [..] }], ref: 60 }
+ */
+function lineChart(opts) {
+  var W = 520, H = 220, L = 34, Rm = 16, T = 12, B = 40;
+  var all = [];
+  opts.series.forEach(function (s) { s.values.forEach(function (v) { if (v != null) all.push(v); }); });
+  if (!all.length) return '<div class="empty">No grades to chart yet.</div>';
+  var lo = Math.max(0, Math.floor((Math.min.apply(null, all.concat([opts.ref || 100])) - 5) / 20) * 20);
+  var hi = Math.min(110, Math.max(100, Math.ceil(Math.max.apply(null, all) / 10) * 10));
+  var n = opts.labels.length, pw = W - L - Rm, ph = H - T - B;
+  var x = function (i) { return L + (n === 1 ? pw / 2 : pw * i / (n - 1)); };
+  var y = function (v) { return T + ph * (1 - (v - lo) / (hi - lo)); };
+  var svg = '';
+  for (var g = lo; g <= hi; g += (hi - lo > 60 ? 20 : 10)) {
+    svg += '<line class="gridline" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + y(g) + '" y2="' + y(g) + '"/>' +
+           '<text x="' + (L - 6) + '" y="' + (y(g) + 4) + '" text-anchor="end">' + g + '</text>';
+  }
+  if (opts.ref != null && opts.ref > lo && opts.ref < hi) {
+    svg += '<line class="ref" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + y(opts.ref) + '" y2="' + y(opts.ref) + '"/>';
+  }
+  svg += '<line class="baseline" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + (T + ph) + '" y2="' + (T + ph) + '"/>';
+  var step = Math.max(1, Math.ceil(n / (opts.maxLabels || 8)));
+  opts.labels.forEach(function (lab, i) {
+    if (i % step && i !== n - 1) return;
+    svg += '<text x="' + x(i) + '" y="' + (H - B + 16) + '" text-anchor="middle">' + esc(lab) + '</text>';
+    if (opts.sublabels && opts.sublabels[i]) {
+      svg += '<text x="' + x(i) + '" y="' + (H - B + 30) + '" text-anchor="middle">' + esc(opts.sublabels[i]) + '</text>';
+    }
+  });
+  opts.series.forEach(function (s) {
+    var path = '', open = false;
+    s.values.forEach(function (v, i) {
+      if (v == null) { open = false; return; }
+      path += (open ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1) + ' ';
+      open = true;
+    });
+    svg += '<path d="' + path + '" fill="none" stroke="' + s.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    s.values.forEach(function (v, i) {
+      if (v != null) svg += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="4" fill="' + s.color + '" stroke="var(--card)" stroke-width="2"/>';
+    });
+  });
+  svg += '<line class="crosshair" data-cross x1="0" x2="0" y1="' + T + '" y2="' + (T + ph) + '" visibility="hidden"/>';
+  var colW = n === 1 ? pw : pw / (n - 1);
+  opts.labels.forEach(function (lab, i) {
+    svg += '<rect data-i="' + i + '" x="' + (x(i) - colW / 2) + '" y="' + T + '" width="' + colW + '" height="' + ph +
+           '" fill="transparent"/>';
+  });
+  var id = 'c' + Math.random().toString(36).slice(2);
+  CHARTS[id] = { type: 'line', opts: opts, x: x };
+  var legend = opts.series.length > 1 ? '<div class="legend">' + opts.series.map(function (s) {
+    return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + '</span>';
+  }).join('') + '</div>' : '';
+  return legend + '<div class="chart" data-chart="' + id + '"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+         esc(opts.title || 'Line chart') + '">' + svg + '</svg></div>';
+}
+
+/** Vertical bars, one series. opts: { labels, values, notes, title } */
+function barChart(opts) {
+  var W = 520, H = 200, L = 34, Rm = 8, T = 16, B = 26;
+  var max = Math.max.apply(null, opts.values.concat([1]));
+  var nice = Math.pow(10, Math.floor(Math.log10(max))), top = Math.ceil(max / nice) * nice;
+  var n = opts.labels.length, pw = W - L - Rm, ph = H - T - B, slot = pw / n, bw = Math.min(56, slot - 8);
+  var y = function (v) { return T + ph * (1 - v / top); };
+  var svg = '';
+  [0, top / 2, top].forEach(function (g) {
+    svg += '<line class="gridline" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + y(g) + '" y2="' + y(g) + '"/>' +
+           '<text x="' + (L - 6) + '" y="' + (y(g) + 4) + '" text-anchor="end">' + (Math.round(g * 10) / 10) + '</text>';
+  });
+  opts.values.forEach(function (v, i) {
+    var cx = L + slot * i + slot / 2, h = ph * v / top;
+    if (v > 0) {
+      var r = Math.min(4, bw / 2, h);
+      var x0 = cx - bw / 2, y0 = T + ph - h;
+      svg += '<path d="M' + x0 + ' ' + (T + ph) + 'V' + (y0 + r) + 'Q' + x0 + ' ' + y0 + ' ' + (x0 + r) + ' ' + y0 +
+             'H' + (x0 + bw - r) + 'Q' + (x0 + bw) + ' ' + y0 + ' ' + (x0 + bw) + ' ' + (y0 + r) + 'V' + (T + ph) + 'Z" fill="var(--series-1)"/>';
+      svg += '<text x="' + cx + '" y="' + (y0 - 4) + '" text-anchor="middle" style="fill:var(--muted)">' + v + '</text>';
+    }
+    svg += '<text x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(opts.labels[i]) + '</text>';
+    svg += '<rect data-i="' + i + '" x="' + (L + slot * i) + '" y="' + T + '" width="' + slot + '" height="' + ph + '" fill="transparent"/>';
+  });
+  svg += '<line class="baseline" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + (T + ph) + '" y2="' + (T + ph) + '"/>';
+  var id = 'c' + Math.random().toString(36).slice(2);
+  CHARTS[id] = { type: 'bar', opts: opts };
+  return '<div class="chart" data-chart="' + id + '"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+         esc(opts.title || 'Bar chart') + '">' + svg + '</svg></div>';
+}
+
+function sparkline(values) {
+  var v = values.filter(function (x) { return x != null; });
+  if (v.length < 2) return '';
+  var W = 64, H = 18, lo = Math.min.apply(null, v), hi = Math.max.apply(null, v);
+  if (hi - lo < 10) { var mid = (hi + lo) / 2; lo = mid - 5; hi = mid + 5; }
+  var pts = v.map(function (g, i) {
+    return [(2 + (W - 4) * i / (v.length - 1)).toFixed(1), (2 + (H - 4) * (1 - (g - lo) / (hi - lo))).toFixed(1)];
+  });
+  var last = pts[pts.length - 1];
+  return '<svg class="spark" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><polyline points="' +
+         pts.map(function (p) { return p.join(','); }).join(' ') + '"/><circle cx="' + last[0] + '" cy="' + last[1] + '" r="2"/></svg>';
+}
+
+var CHARTS = {};
+document.addEventListener('mousemove', function (e) {
+  var rect = e.target.closest && e.target.closest('[data-i]');
+  var box = rect && rect.closest('[data-chart]');
+  document.querySelectorAll('[data-cross]').forEach(function (c) { c.setAttribute('visibility', 'hidden'); });
+  if (!box || !CHARTS[box.getAttribute('data-chart')]) return hideTip();
+  var ch = CHARTS[box.getAttribute('data-chart')], i = +rect.getAttribute('data-i'), o = ch.opts, html;
+  if (ch.tip) {
+    html = ch.tip(i);
+  } else if (ch.type === 'line') {
+    var cross = box.querySelector('[data-cross]');
+    cross.setAttribute('x1', ch.x(i)); cross.setAttribute('x2', ch.x(i)); cross.setAttribute('visibility', 'visible');
+    html = '<b>' + esc(o.labels[i]) + (o.sublabels && o.sublabels[i] ? ' · ' + esc(o.sublabels[i]) : '') + '</b>' +
+      o.series.map(function (s) {
+        return (o.series.length > 1 ? '<span style="color:' + s.color + '">●</span> ' + esc(s.name) + ': ' : '') +
+               (s.values[i] == null ? '—' : s.values[i].toFixed(1) + '%') +
+               (s.notes && s.notes[i] ? ' <span class="sub">' + esc(s.notes[i]) + '</span>' : '');
+      }).join('<br>');
+  } else {
+    html = '<b>' + esc(o.labels[i]) + '</b>' + o.values[i] + (o.unit ? ' ' + o.unit : '') +
+           (o.notes && o.notes[i] ? '<br><span class="sub">' + esc(o.notes[i]) + '</span>' : '');
+  }
+  showTip(html, e.clientX, e.clientY);
+});
+document.addEventListener('scroll', hideTip, { passive: true });
+
+/* ---------------------------------------------------------------------
+   Grade distribution: share of grades in each letter band. Shown as percentages so semesters
+   (and groups) of different sizes can be compared; counts are in the table and tooltips.
+   --------------------------------------------------------------------- */
+var LETTER_RANGES = ['85–100', '80–84', '75–79', '70–74', '60–69', '50–59', 'below 50'];
+
+function letterCounts(grades) {
+  var counts = LETTERS.map(function () { return 0; }), n = 0;
+  grades.forEach(function (g) { if (g != null) { counts[LETTERS.indexOf(letter(g))]++; n++; } });
+  return { counts: counts, n: n, pct: counts.map(function (c) { return n ? c / n * 100 : 0; }) };
+}
+function pct0(p) { return p > 0 && p < 1 ? '<1%' : Math.round(p) + '%'; }
+
+/** Bars / Proportions switch for a distribution panel head. */
+function distModeChips() {
+  return '<div class="chips small" role="group" aria-label="Chart type">' +
+    '<button class="chip" data-dist-mode="bars" aria-pressed="' + (S.distMode === 'bars') + '">Bars</button>' +
+    '<button class="chip" data-dist-mode="donut" aria-pressed="' + (S.distMode === 'donut') + '">Proportions</button></div>';
+}
+
+/**
+ * d: { cur: [pct], prev: [pct] | null, unit: 'grades', curLabel: '2026 Fall', prevLabel: '2026 Spring final' }
+ * Returns the chart plus a table with the same numbers (always visible next to the donut; folded
+ * under "Show numbers" below the bars).
+ */
+function distribution(d) {
+  var cur = letterCounts(d.cur), prev = d.prev && d.prev.length ? letterCounts(d.prev) : null;
+  if (!cur.n) return '<div class="empty">No grades to show yet.</div>';
+  var tip = function (i) {
+    return '<b>' + LETTERS[i] + ' (' + LETTER_RANGES[i] + ')</b>' + esc(d.curLabel) + ': ' + pct0(cur.pct[i]) +
+      ' <span class="sub">(' + cur.counts[i] + ' of ' + cur.n + ' ' + d.unit + ')</span>' +
+      (prev ? '<br>' + esc(d.prevLabel) + ': ' + pct0(prev.pct[i]) + ' <span class="sub">(' + prev.counts[i] + ' of ' + prev.n + ')</span>' : '');
+  };
+  var donut = S.distMode === 'donut';
+  var chart = donut ? donutChart(cur, d.unit, tip) : distBars(cur, prev, d, tip);
+  var numbers = distTable(cur, prev, d, donut);
+  return donut ? '<div class="dist-body">' + chart + numbers + '</div>'
+               : chart + '<details><summary>Show numbers</summary>' + numbers + '</details>';
+}
+
+function distTable(cur, prev, d, swatches) {
+  return '<div class="table-wrap"><table class="dist-table"><thead><tr><th>Grade</th><th class="rng">Range</th><th class="num">' + esc(d.curLabel) + '</th>' +
+    (prev ? '<th class="num">' + esc(d.prevLabel) + '</th><th class="num" title="Percentage points">Change</th>' : '') +
+    '</tr></thead><tbody>' + LETTERS.map(function (L, i) {
+      var change = prev ? cur.pct[i] - prev.pct[i] : null;
+      return '<tr><td>' + (swatches ? '<i class="swatch" style="background:var(--dist-' + i + ')"></i>' : '') + '<b>' + L + '</b></td>' +
+        '<td class="sub rng">' + LETTER_RANGES[i] + '</td>' +
+        '<td class="num">' + pct0(cur.pct[i]) + ' <span class="sub">(' + cur.counts[i] + ')</span></td>' +
+        (prev ? '<td class="num">' + pct0(prev.pct[i]) + ' <span class="sub">(' + prev.counts[i] + ')</span></td>' +
+                '<td class="num sub">' + (Math.abs(change) < 0.5 ? '0' : (change > 0 ? '+' : '−') + Math.abs(change).toFixed(0)) + ' pts</td>' : '') +
+        '</tr>';
+    }).join('') + '<tr><td class="sub">Total</td><td class="rng"></td><td class="num sub">' + cur.n + ' ' + esc(d.unit) + '</td>' +
+    (prev ? '<td class="num sub">' + prev.n + '</td><td></td>' : '') + '</tr></tbody></table></div>';
+}
+
+/** Share per letter as columns; last semester as a lighter column beside each one. */
+function distBars(cur, prev, d, tip) {
+  var W = 520, H = 210, L = 38, Rm = 8, T = 18, B = 26;
+  var max = Math.max.apply(null, cur.pct.concat(prev ? prev.pct : []).concat([10]));
+  var top = Math.ceil(max / 10) * 10;
+  var n = LETTERS.length, pw = W - L - Rm, ph = H - T - B, slot = pw / n;
+  var bw = prev ? Math.min(26, (slot - 12) / 2) : Math.min(52, slot - 10);
+  var y = function (v) { return T + ph * (1 - v / top); };
+  var svg = '';
+  [0, top / 2, top].forEach(function (g) {
+    svg += '<line class="gridline" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + y(g) + '" y2="' + y(g) + '"/>' +
+           '<text x="' + (L - 6) + '" y="' + (y(g) + 4) + '" text-anchor="end">' + g + '%</text>';
+  });
+  var bar = function (x0, v, fill) {
+    var h = ph * v / top;
+    if (h <= 0) return '';
+    var r = Math.min(4, bw / 2, h), y0 = T + ph - h;
+    return '<path d="M' + x0 + ' ' + (T + ph) + 'V' + (y0 + r) + 'Q' + x0 + ' ' + y0 + ' ' + (x0 + r) + ' ' + y0 +
+           'H' + (x0 + bw - r) + 'Q' + (x0 + bw) + ' ' + y0 + ' ' + (x0 + bw) + ' ' + (y0 + r) + 'V' + (T + ph) + 'Z" fill="' + fill + '"/>';
+  };
+  LETTERS.forEach(function (lab, i) {
+    var cx = L + slot * i + slot / 2;
+    var xCur = prev ? cx - bw - 1 : cx - bw / 2;            // 2px gap between the pair
+    svg += bar(xCur, cur.pct[i], 'var(--series-1)');
+    if (prev) svg += bar(cx + 1, prev.pct[i], 'var(--dist-prev)');
+    if (cur.counts[i]) {
+      svg += '<text x="' + (xCur + bw / 2) + '" y="' + (y(cur.pct[i]) - 5) + '" text-anchor="middle" style="fill:var(--muted)">' + pct0(cur.pct[i]) + '</text>';
+    }
+    svg += '<text x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle" style="fill:var(--muted);font-weight:600">' + lab + '</text>';
+    svg += '<rect data-i="' + i + '" x="' + (L + slot * i) + '" y="' + T + '" width="' + slot + '" height="' + (ph + B) + '" fill="transparent"/>';
+  });
+  svg += '<line class="baseline" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + (T + ph) + '" y2="' + (T + ph) + '"/>';
+  var id = 'c' + Math.random().toString(36).slice(2);
+  CHARTS[id] = { type: 'dist', tip: tip };
+  var legend = prev ? '<div class="legend"><span><i style="background:var(--series-1);height:10px;width:10px"></i>' + esc(d.curLabel) +
+    '</span><span><i style="background:var(--dist-prev);height:10px;width:10px"></i>' + esc(d.prevLabel) + '</span></div>' : '';
+  return legend + '<div class="chart" data-chart="' + id + '"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+    esc('Share of ' + d.unit + ' per letter grade: ' + LETTERS.map(function (l, i) { return l + ' ' + pct0(cur.pct[i]); }).join(', ')) +
+    '">' + svg + '</svg></div>';
+}
+
+/** Donut of the share per letter (A at 12 o'clock, clockwise), with the total in the middle. */
+function donutChart(cur, unit, tip) {
+  var C = 100, R = 92, r = 56, svg = '', a = -Math.PI / 2;
+  var pt = function (rad, ang) { return (C + rad * Math.cos(ang)).toFixed(2) + ' ' + (C + rad * Math.sin(ang)).toFixed(2); };
+  var arc = function (a0, a1) {
+    var large = a1 - a0 > Math.PI ? 1 : 0;
+    return 'M' + pt(R, a0) + 'A' + R + ' ' + R + ' 0 ' + large + ' 1 ' + pt(R, a1) +
+           'L' + pt(r, a1) + 'A' + r + ' ' + r + ' 0 ' + large + ' 0 ' + pt(r, a0) + 'Z';
+  };
+  LETTERS.forEach(function (lab, i) {
+    var share = cur.counts[i] / cur.n;
+    if (!share) return;
+    var a1 = a + share * 2 * Math.PI;
+    var paths = share > 0.9999 ? [arc(a, a + Math.PI), arc(a + Math.PI, a1)] : [arc(a, a1)];   // a full ring needs two arcs
+    paths.forEach(function (p) {
+      svg += '<path data-i="' + i + '" d="' + p + '" fill="var(--dist-' + i + ')" stroke="var(--card)" stroke-width="2" stroke-linejoin="round"/>';
+    });
+    if (share >= 0.07) {   // label only slices big enough to hold it
+      var mid = (a + a1) / 2, rm = (R + r) / 2;
+      svg += '<text x="' + (C + rm * Math.cos(mid)).toFixed(1) + '" y="' + (C + rm * Math.sin(mid) + 4).toFixed(1) +
+             '" text-anchor="middle" pointer-events="none" style="fill:var(--dist-ink-' + i + ');font-weight:600">' + lab + '</text>';
+    }
+    a = a1;
+  });
+  svg += '<text x="' + C + '" y="' + (C + 2) + '" text-anchor="middle" style="fill:var(--text);font-size:24px;font-weight:650">' + cur.n + '</text>' +
+         '<text x="' + C + '" y="' + (C + 20) + '" text-anchor="middle">' + esc(unit) + '</text>';
+  var id = 'c' + Math.random().toString(36).slice(2);
+  CHARTS[id] = { type: 'dist', tip: tip };
+  return '<div class="chart" data-chart="' + id + '"><svg viewBox="0 0 200 200" role="img" aria-label="' +
+    esc('Share of ' + unit + ' per letter grade: ' + LETTERS.map(function (l, i) { return l + ' ' + pct0(cur.pct[i]); }).join(', ')) +
+    '">' + svg + '</svg></div>';
+}
+
+/** The semester before the latest one these students are in, if the data has it. */
+function previousSemester(students) {
+  var curSem = students.map(function (s) { return s.semester; }).sort(semesterOrder).pop();
+  var secs = uniq(students.map(function (s) { return s.section; }));
+  var H = S.data.history, sems = [], dept = filters().dept;
+  students.forEach(function (st) { st.past.forEach(function (ps) { sems.push(ps.semester); }); });
+  H.timeline.forEach(function (t) {
+    var name = H.courses[t[2]];
+    if (secs.indexOf(t[0]) !== -1 && name && (!dept || deptOf(name) === dept)) sems.push(t[1]);
+  });
+  return uniq(sems).filter(function (s) { return semesterOrder(s, curSem) < 0; }).sort(semesterOrder).pop() || null;
+}
+
+/**
+ * Final class averages of an earlier semester (each class's last grade update). With a grade-level
+ * or homeroom filter: only the classes these students took then; otherwise every class of the
+ * students' sections.
+ */
+function pastClassAverages(students, sem, limitToTheirClasses) {
+  var H = S.data.history, secs = uniq(students.map(function (s) { return s.section; })), only = null;
+  var dept = filters().dept;
+  if (limitToTheirClasses) {
+    only = {};
+    students.forEach(function (st) { st.past.forEach(function (ps) {
+      if (ps.semester === sem) ps.courses.forEach(function (c) { only[c.course] = true; });
+    }); });
+  }
+  var last = {};
+  H.timeline.forEach(function (t) {
+    var name = H.courses[t[2]];
+    if (t[1] !== sem || !name || t[4] == null || (only ? !only[name] : secs.indexOf(t[0]) === -1)) return;
+    if (dept && deptOf(name) !== dept) return;
+    var k = t[0] + '\u0001' + name;
+    if (!last[k] || natural(t[3], last[k].day) > 0) last[k] = { day: t[3], avg: t[4] };
+  });
+  return Object.keys(last).map(function (k) { return last[k].avg; });
+}
+
+/** Overview panel: student course grades or class averages, compared with last semester's finals. */
+function overviewDistribution(students) {
+  var f = filters(), classes = S.distUnit === 'classes', cur = [], prev = [], left = 0;
+  var prevSem = previousSemester(students);
+  var curSem = students.map(function (s) { return s.semester; }).sort(semesterOrder).pop();
+  var secs = uniq(students.map(function (s) { return s.section; }));
+  var asOf = uniq(secs.map(function (s) { return S.data.sections[s] && S.data.sections[s].snapshot; })).join(' / ');
+  var note;
+  if (classes) {
+    filteredCourses().forEach(function (co) { if (co.avg == null) left++; else cur.push(co.avg); });
+    if (prevSem) prev = pastClassAverages(students, prevSem, !!(f.grade || f.homeroom));
+    note = (f.dept ? f.dept + ' classes only. ' : '') + 'Each class counts once, using its class average (' + cur.length + ' classes).' +
+      (left ? ' ' + left + ' class' + (left === 1 ? ' has' : 'es have') + ' no overall grade in Classroom and ' + (left === 1 ? 'is' : 'are') + ' left out.' : '');
+    if (prev.length) note += ' Compared with the final class averages of ' + prevSem +
+      (f.grade || f.homeroom ? ' in the classes these students took then.' : ' classes in the same section' + (secs.length > 1 ? 's' : '') + '.');
+  } else {
+    students.forEach(function (st) { st.courses.forEach(function (c) {
+      if (c.grade == null) return;
+      if (c.counts) cur.push(c.grade); else left++;
+    }); });
+    if (prevSem) students.forEach(function (st) { st.past.forEach(function (ps) {
+      if (ps.semester === prevSem) ps.courses.forEach(function (c) { if (c.g != null) prev.push(c.g); });
+    }); });
+    note = (f.dept ? f.dept + ' courses only. ' : '') +
+      'One grade per student per course, so a student taking 7 courses counts 7 times (' + cur.length + ' grades from ' +
+      students.length + ' students).' + (left ? ' ' + left + ' grade' + (left === 1 ? '' : 's') + ' with fewer than ' +
+      S.data.rules.minGraded + ' graded assignments ' + (left === 1 ? 'is' : 'are') + ' left out, as in the averages.' : '');
+    if (prev.length) note += ' Compared with the ' + prevSem + ' final grades of the same students.';
+  }
+  if (!prev.length) note += ' There is no earlier semester in the data to compare with.';
+  note += ' ' + curSem + ' grades are as of the last update (' + asOf + ').';
+  return '<section class="panel"><div class="panel-head"><h3>Grade distribution</h3>' +
+    '<div class="chips small" role="group" aria-label="What to count">' +
+    '<button class="chip" data-dist-unit="students" aria-pressed="' + !classes + '">Student grades</button>' +
+    '<button class="chip" data-dist-unit="classes" aria-pressed="' + classes + '">Class averages</button></div>' +
+    distModeChips() + '</div>' +
+    '<div class="dist-note">' + esc(note) + '</div>' +
+    distribution({ cur: cur, prev: prev, unit: classes ? 'classes' : 'grades', curLabel: curSem + ' so far',
+                   prevLabel: prevSem ? prevSem + ' final' : '' }) + '</section>';
+}
+
+/**
+ * Average of a group of students over time: each earlier semester's final grades, then every
+ * update of the current semester. The same students are followed across semesters.
+ */
+function cohortSeries(students) {
+  var points = {};   // label -> {sum, n, sub}
+  var add = function (key, label, sub, g) {
+    var p = points[key] || (points[key] = { label: label, sub: sub, sum: 0, n: 0 });
+    if (g != null) { p.sum += g; p.n++; }
+  };
+  students.forEach(function (st) {
+    st.past.forEach(function (ps) {
+      // Short two-line labels ("2023" / "Fall") so every semester since the archive fits on the axis.
+      var m = /^(\d{4}) (\w+)/.exec(ps.semester) || [null, ps.semester, ''];
+      ps.courses.forEach(function (c) { add('0' + ps.semester, m[1], m[2], c.g); });
+    });
+    st.courses.forEach(function (c) {
+      if (c.counts) c.trend.forEach(function (t) { add('1' + t.day, shortDay(t.day), (st.semester || '').replace(/^\d{4} /, ''), t.g); });
+    });
+  });
+  var keys = Object.keys(points).sort(function (a, b) {
+    if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
+    return a[0] === '0' ? semesterOrder(a.slice(1), b.slice(1)) : natural(a, b);
+  });
+  return keys.map(function (k) { var p = points[k]; return { key: k, label: p.label, sub: p.sub, avg: p.n ? p.sum / p.n : null, n: p.n }; });
+}
+
+function trendChart(groups, title) {
+  // groups: [{name, color, students}] -> one line each, aligned on the union of points.
+  return alignedChart(groups.map(function (g) { return { name: g.name, color: g.color, pts: cohortSeries(g.students) }; }),
+                      title, 'course grades');
+}
+
+/**
+ * Whole school (or one section / department) over time: every student who was in a class that semester,
+ * including students who have left. Earlier semesters = final grades (history.semesterClasses: class
+ * averages weighted by graded students); this semester = each grade update (history.timeline).
+ * Grade-level / homeroom filters don't apply (former students have no current grade level).
+ */
+function schoolSeries(section, dept) {
+  var H = S.data.history, points = {};
+  var add = function (key, label, sub, avg, n) {
+    if (avg == null || !n) return;
+    var p = points[key] || (points[key] = { label: label, sub: sub, sum: 0, n: 0 });
+    p.sum += avg * n; p.n += n;
+  };
+  var ok = function (sec, course) { return course && (!section || sec === section) && (!dept || deptOf(course) === dept); };
+  var current = {};
+  S.courseList.forEach(function (co) { current[co.section] = co.semester; });
+  (H.semesterClasses || []).forEach(function (r) {
+    var course = H.courses[r[2]];
+    if (!ok(r[0], course)) return;
+    // Only semesters before the section's current one (the current semester comes from the updates below).
+    if (current[r[0]] && semesterOrder(r[1], current[r[0]]) >= 0) return;
+    var m = /^(\d{4}) (\w+)/.exec(r[1]) || [null, r[1], ''];
+    add('0' + r[1], m[1], m[2], r[3], r[4]);
+  });
+  H.timeline.forEach(function (t) {
+    var course = H.courses[t[2]];
+    if (!ok(t[0], course) || t[1] !== current[t[0]]) return;
+    add('1' + t[3], shortDay(t[3]), (t[1] || '').replace(/^\d{4} /, ''), t[4], t[5]);
+  });
+  return Object.keys(points).map(function (k) {
+    var p = points[k]; return { key: k, label: p.label, sub: p.sub, avg: p.sum / p.n, n: p.n };
+  });
+}
+
+function schoolGroups() {
+  var f = filters();
+  var secs = f.section ? [f.section] : uniq(S.courseList.map(function (co) { return co.section; })).sort(natural);
+  var colors = ['var(--series-1)', 'var(--series-2)'];
+  if (secs.length > 2) return [{ name: 'All students', color: colors[0], pts: schoolSeries('', f.dept) }];
+  return secs.map(function (sec, i) { return { name: sec, color: colors[i], pts: schoolSeries(sec, f.dept) }; });
+}
+
+function overviewSchool() {
+  var f = filters(), groups = schoolGroups();
+  var note = (f.grade || f.homeroom ? 'Grade-level and homeroom filters do not apply here (former students have none). ' : '') +
+             'Final grades of every student in each semester, including students who have left; this semester shows each grade update.';
+  var chart = '<section class="panel"><div class="panel-head"><h3>All students over time</h3><span class="sub">everyone in the classes each semester' +
+    (f.dept ? ' · ' + esc(f.dept) : '') + ' · red line = 60%</span></div>' +
+    alignedChart(groups, 'All students over time', 'grades') + '<div class="sub">' + note + '</div></section>';
+  // Table: one row per semester (final grades) plus "now" (latest update of this semester).
+  var rows = {};
+  groups.forEach(function (g, gi) {
+    var last = null;
+    g.pts.forEach(function (p) {
+      if (p.key[0] === '1') { last = p; return; }
+      var r = rows[p.key] || (rows[p.key] = { key: p.key, label: p.label + ' ' + p.sub, v: [] });
+      r.v[gi] = p;
+    });
+    if (last) {
+      var r = rows['1'] || (rows['1'] = { key: '1', label: 'This semester (latest update)', v: [] });
+      r.v[gi] = last;
+    }
+  });
+  var list = Object.keys(rows).map(function (k) { return rows[k]; }).sort(function (a, b) {
+    if (a.key[0] !== b.key[0]) return a.key[0] < b.key[0] ? 1 : -1;
+    return semesterOrder(b.key.slice(1), a.key.slice(1));
+  });
+  var cols = [{ key: 'sem', label: 'Semester', html: function (r) { return esc(r.label); } }];
+  groups.forEach(function (g, gi) {
+    cols.push({ key: 'g' + gi, label: esc(g.name), num: true, html: function (r) {
+      var p = r.v[gi];
+      return p ? p.avg.toFixed(1) + '% <span class="sub">(' + p.n + (r.key === '1' ? ', ' + p.label : '') + ')</span>' : '<span class="sub">—</span>';
+    } });
+  });
+  var table = '<section class="panel"><div class="panel-head"><h3>Average by semester</h3><span class="sub">all students · (number of grades)</span></div>' +
+    '<div class="table-wrap"><table><thead><tr>' + cols.map(function (c) { return '<th class="' + (c.num ? 'num' : '') + '">' + c.label + '</th>'; }).join('') +
+    '</tr></thead><tbody>' + (list.length ? list.map(function (r) {
+      return '<tr>' + cols.map(function (c) { return '<td class="' + (c.num ? 'num' : '') + '">' + c.html(r) + '</td>'; }).join('') + '</tr>';
+    }).join('') : '<tr><td colspan="' + cols.length + '" class="empty">Nothing to show.</td></tr>') + '</tbody></table></div></section>';
+  return '<div class="cols">' + chart + table + '</div>';
+}
+
+/** series: [{name, color, pts: [{key ('0'+semester | '1'+day), label, sub, avg, n}]}], aligned on the union of keys. */
+function alignedChart(series, title, unit) {
+  var keys = [];
+  series.forEach(function (s) { s.pts.forEach(function (p) { if (keys.indexOf(p.key) === -1) keys.push(p.key); }); });
+  keys.sort(function (a, b) {
+    if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
+    return a[0] === '0' ? semesterOrder(a.slice(1), b.slice(1)) : natural(a, b);
+  });
+  if (!keys.length) return '<div class="empty">No grade history yet.</div>';
+  var labelOf = {}, subOf = {};
+  series.forEach(function (s) { s.pts.forEach(function (p) { labelOf[p.key] = p.label; subOf[p.key] = p.sub; }); });
+  return lineChart({
+    title: title, ref: 60, maxLabels: 14,
+    labels: keys.map(function (k) { return labelOf[k]; }),
+    sublabels: keys.map(function (k) { return subOf[k]; }),
+    series: series.map(function (s) {
+      var by = {}; s.pts.forEach(function (p) { by[p.key] = p; });
+      return { name: s.name, color: s.color,
+               values: keys.map(function (k) { return by[k] ? by[k].avg : null; }),
+               notes: keys.map(function (k) { return by[k] ? '(' + (k[0] === '0' ? 'final grades, ' : '') + by[k].n + ' ' + unit + ')' : ''; }) };
+    })
+  });
+}
+
+/* =====================================================================
+   Tables
+   ===================================================================== */
+/** cols: [{key, label, num, get(sort value), html(row)}]; rows clickable via rowAttr(row) */
+function table(id, cols, rows, opts) {
+  opts = opts || {};
+  var sort = S.sort[id] || opts.defaultSort || { key: cols[0].key, dir: 1 };
+  var col = cols.filter(function (c) { return c.key === sort.key; })[0] || cols[0];
+  rows = rows.slice().sort(function (a, b) {
+    var x = col.get(a), y = col.get(b);
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return (typeof x === 'string' ? natural(x, y) : x - y) * sort.dir;
+  });
+  var limit = opts.limit && rows.length > opts.limit ? opts.limit : null;
+  var shown = limit ? rows.slice(0, limit) : rows;
+  return '<div class="table-wrap"><table data-table="' + id + '"><thead><tr>' + cols.map(function (c) {
+    var arrow = c.key === sort.key ? (sort.dir > 0 ? ' ▲' : ' ▼') : '';
+    return '<th class="' + (c.num ? 'num' : '') + '"' + (c.get ? ' data-sort="' + c.key + '" data-num="' + (c.num ? 1 : 0) + '"' : '') +
+           (c.title ? ' title="' + esc(c.title) + '"' : '') + '>' + c.label + arrow + '</th>';
+  }).join('') + '</tr></thead><tbody>' + (shown.length ? shown.map(function (r) {
+    return '<tr' + (opts.rowAttr ? ' class="click" ' + opts.rowAttr(r) : '') + '>' + cols.map(function (c) {
+      return '<td class="' + (c.num ? 'num' : '') + (c.wrap ? ' wrap' : '') + '">' + c.html(r) + '</td>';
+    }).join('') + '</tr>';
+  }).join('') : '<tr><td colspan="' + cols.length + '" class="empty">Nothing to show.</td></tr>') + '</tbody></table></div>' +
+  (limit ? '<div class="sub" style="margin-top:6px">Showing ' + limit + ' of ' + rows.length + '. Use the filters or sort to see others.</div>' : '');
+}
+
+var STUDENT_COLS = {
+  name: { key: 'name', label: 'Student', get: function (s) { return s.name; }, html: function (s) { return esc(s.name); } },
+  grade: { key: 'grade', label: 'Grade', get: function (s) { return s.grade; }, html: function (s) { return esc(s.grade.replace('Grade ', 'G')); } },
+  homeroom: { key: 'homeroom', label: 'Homeroom', get: function (s) { return s.homeroom || null; }, html: function (s) { return esc(s.homeroom || '—'); } },
+  status: { key: 'status', label: 'Status', get: function (s) { return STATUS[s.status].rank; }, html: function (s) { return statusBadge(s.status); } },
+  reasons: { key: 'reasons', label: 'Why', wrap: true, html: function (s) { return '<div class="reasons">' + esc(s.reasons.join(' · ') || '—') + '</div>'; } },
+  avg: { key: 'avg', label: 'Average', num: true, get: function (s) { return s.avg; }, html: function (s) { return pill(s.avg); } },
+  dUpd: { key: 'dUpd', label: 'Since last update', num: true, title: 'Change in average since the last saved grade pull, normally the one for the monthly grade reports (same courses)',
+          get: function (s) { return s.deltaUpdate; }, html: function (s) { return delta(s.deltaUpdate); } },
+  dSem: { key: 'dSem', label: 'vs last semester', num: true, title: 'Current average minus the average of last semester\'s final grades',
+          get: function (s) { return s.deltaSem; }, html: function (s) { return delta(s.deltaSem, s.lastSem ? s.lastSem.semester + ': ' + fmt(s.lastSem.avg) : ''); } },
+  missing: { key: 'missing', label: 'Missing', num: true, get: function (s) { return s.missing; },
+             html: function (s) { return s.missing ? '<span class="tag missing">' + s.missing + '</span>' : '0'; } },
+  drafts: { key: 'drafts', label: 'Not returned', num: true, title: 'Assignments the teacher has graded but not returned yet (draft grades); not in the average',
+            get: function (s) { return s.drafts; }, html: function (s) { return draftTag(s.drafts); } },
+  below: { key: 'below', label: 'Courses < 60', num: true, get: function (s) { return s.below60; }, html: function (s) { return s.below60 || '0'; } },
+  lowest: { key: 'lowest', label: 'Lowest course', get: function (s) { return s.lowest ? s.lowest.grade : null; },
+            html: function (s) { return s.lowest ? esc(shortCourse(s.lowest.course)) + ' ' + pill(s.lowest.grade) : '—'; } }
+};
+function studentRowAttr(s) { return 'data-student="' + esc(s.id) + '"'; }
+
+/* =====================================================================
+   Views
+   ===================================================================== */
+function render() {
+  hideTip();
+  CHARTS = {};
+  document.querySelectorAll('#tabs button').forEach(function (b) {
+    b.setAttribute('aria-selected', String(!S.page && b.getAttribute('data-tab') === S.tab));
+  });
+  var html;
+  if (S.page && S.page.type === 'course') html = renderCourse(S.page.id);
+  else if (S.page && S.page.type === 'dept') html = renderDept(S.page.id);
+  else if (S.page && S.page.type === 'student') html = renderStudent(S.page.id);
+  else html = ({ overview: renderOverview, watch: renderWatch, courses: renderCourses,
+                 depts: renderDepartments, students: renderStudents, past: renderPast, about: renderAbout })[S.tab]();
+  $('view').innerHTML = html;
+}
+
+function sectionGroups(students) {
+  var secs = uniq(students.map(function (s) { return s.section; })).sort(natural);
+  var colors = ['var(--series-1)', 'var(--series-2)'];
+  if (secs.length > 2) return [{ name: 'All students', color: colors[0], students: students }];
+  return secs.map(function (sec, i) {
+    return { name: sec, color: colors[i], students: students.filter(function (s) { return s.section === sec; }) };
+  });
+}
+
+function renderOverview() {
+  var students = filteredStudents(true);
+  if (!students.length) return noData();
+  var nInt = students.filter(function (s) { return s.status === 'intervention'; }).length;
+  var nAtt = students.filter(function (s) { return s.status === 'attention'; }).length;
+  var nDec = students.filter(function (s) { return s.declining; }).length;
+  var avgAll = mean(students.map(function (s) { return s.avg; }));
+  var missing = sum(students.map(function (s) { return s.missing; }));
+  var dSem = mean(students.map(function (s) { return s.deltaSem; }));
+
+  var html = '<div class="tiles">' +
+    tile(students.length, 'Students', filteredCourses().length + ' courses') +
+    tile(avgAll == null ? '—' : avgAll.toFixed(1) + '%', 'Average grade', dSem == null ? 'mean of student averages'
+         : (dSem >= 0 ? '+' : '') + dSem.toFixed(1) + ' vs last semester') +
+    tile(nInt, 'Need intervention', 'open the watch list', 'intervention') +
+    tile(nAtt, 'Need attention', 'open the watch list', 'attention') +
+    tile(nDec, 'Declining', 'dropped ' + S.data.rules.attention.dropAtLeast + '+ points', 'declining') +
+    tile(missing, 'Missing assignments', 'past due, not turned in') +
+    '</div>';
+
+  html += '<div class="cols">' +
+    '<section class="panel"><div class="panel-head"><h3>Average grade over time</h3><span class="sub">same students · red line = 60%</span></div>' +
+    trendChart(sectionGroups(students), 'Average grade over time') +
+    '<div class="sub">Earlier semesters show final grades; this semester shows each grade update.</div></section>' +
+    overviewDistribution(students) + '</div>' + overviewSchool();
+
+  // Cohort table
+  var key = S.groupBy === 'homeroom' ? 'homeroom' : 'grade';
+  var groups = {};
+  students.forEach(function (s) { var k = s[key] || '(none)'; (groups[k] = groups[k] || []).push(s); });
+  var cohort = Object.keys(groups).map(function (k) {
+    var g = groups[k];
+    return { name: k, n: g.length, avg: mean(g.map(function (s) { return s.avg; })),
+             dSem: mean(g.map(function (s) { return s.deltaSem; })),
+             int: g.filter(function (s) { return s.status === 'intervention'; }).length,
+             att: g.filter(function (s) { return s.status === 'attention'; }).length,
+             missing: sum(g.map(function (s) { return s.missing; })),
+             missingPer: g.length ? sum(g.map(function (s) { return s.missing; })) / g.length : 0 };
+  });
+  html += '<section class="panel"><div class="panel-head"><h3>By ' + (key === 'grade' ? 'grade level' : 'homeroom') + '</h3>' +
+    '<div class="chips" style="margin:0">' +
+    '<button class="chip" data-group="grade" aria-pressed="' + (key === 'grade') + '">Grade level</button>' +
+    '<button class="chip" data-group="homeroom" aria-pressed="' + (key === 'homeroom') + '">Homeroom</button></div></div>' +
+    table('cohort', [
+      { key: 'name', label: key === 'grade' ? 'Grade level' : 'Homeroom', get: function (r) { return r.name; }, html: function (r) { return '<button class="link" data-' + key + '="' + esc(r.name) + '">' + esc(r.name) + '</button>'; } },
+      { key: 'n', label: 'Students', num: true, get: function (r) { return r.n; }, html: function (r) { return r.n; } },
+      { key: 'avg', label: 'Average', num: true, get: function (r) { return r.avg; }, html: function (r) { return pill(r.avg); } },
+      { key: 'dSem', label: 'vs last semester', num: true, get: function (r) { return r.dSem; }, html: function (r) { return delta(r.dSem); } },
+      { key: 'int', label: 'Intervention', num: true, get: function (r) { return r.int; }, html: function (r) { return r.int || '0'; } },
+      { key: 'att', label: 'Attention', num: true, get: function (r) { return r.att; }, html: function (r) { return r.att || '0'; } },
+      { key: 'missing', label: 'Missing / student', num: true, get: function (r) { return r.missingPer; }, html: function (r) { return r.missingPer.toFixed(1); } }
+    ], cohort, { defaultSort: { key: 'name', dir: 1 } }) + '</section>';
+
+  // Courses to watch
+  var courses = filteredCourses().filter(function (c) { return !c.hidden; });
+  html += '<section class="panel"><div class="panel-head"><h3>Courses</h3><span class="sub">lowest averages first · click a column to sort</span></div>' +
+    courseTable('ov-courses', courses, { limit: 10, defaultSort: { key: 'avg', dir: 1 } }) + '</section>';
+  return html;
+}
+
+function tile(value, label, note, watchFilter) {
+  var tag = watchFilter ? 'button' : 'div';
+  return '<' + tag + ' class="tile"' + (watchFilter ? ' data-watch="' + watchFilter + '"' : '') + '><div class="label">' + esc(label) +
+         '</div><div class="value">' + esc(value) + '</div>' + (note ? '<div class="note">' + esc(note) + '</div>' : '') + '</' + tag + '>';
+}
+
+function courseTable(id, courses, opts) {
+  return table(id, [
+    { key: 'name', label: 'Course', get: function (c) { return c.name; }, html: function (c) { return esc(c.name); } },
+    { key: 'dept', label: 'Department', get: function (c) { return c.dept; }, html: function (c) { return deptTag(c); } },
+    { key: 'n', label: 'Students', num: true, get: function (c) { return c.n; }, html: function (c) { return c.n; } },
+    { key: 'avg', label: 'Average', num: true, get: function (c) { return c.avg; }, html: function (c) { return pill(c.avg, 'Overall grade hidden in Classroom'); } },
+    { key: 'trend', label: 'Trend', html: function (c) { return sparkline(c.timeline.map(function (t) { return t.avg; })) || '<span class="sub">—</span>'; } },
+    { key: 'below', label: 'Below 60', num: true, get: function (c) { return c.below60; }, html: function (c) { return c.below60 || '0'; } },
+    { key: 'missing', label: 'Missing', num: true, get: function (c) { return c.missing; }, html: function (c) { return c.missing || '0'; } }
+  ], courses, Object.assign({ rowAttr: function (c) { return 'data-course="' + esc(c.name) + '"'; } }, opts));
+}
+
+function renderWatch() {
+  var students = filteredStudents(false);
+  if (!S.studentList.length) return noData();
+  var counts = { all: 0, intervention: 0, attention: 0, declining: 0, missing: 0 };
+  var minMissing = S.data.rules.attention.missingAtLeast;
+  students.forEach(function (s) {
+    if (s.status !== 'ok') counts.all++;
+    counts[s.status] = (counts[s.status] || 0) + 1;
+    if (s.declining) counts.declining++;
+    if (s.missing >= minMissing) counts.missing++;
+  });
+  var f = S.watchFilter;
+  var list = students.filter(function (s) {
+    if (f === 'all') return s.status !== 'ok';
+    if (f === 'declining') return s.declining;
+    if (f === 'missing') return s.missing >= minMissing;
+    return s.status === f;
+  });
+  var chip = function (key, label) {
+    return '<button class="chip" data-watch="' + key + '" aria-pressed="' + (f === key) + '">' + label + ' (' + counts[key] + ')</button>';
+  };
+  return '<section class="panel"><div class="panel-head"><h3>Students who may need support</h3>' +
+    '<span class="sub">' + esc(S.session.isAll ? 'all courses' : 'your courses only') + ' · flags follow the rules under "How it works"' +
+    (filters().dept ? ' · students taking ' + esc(filters().dept) + ' courses' : '') + '</span></div>' +
+    (filters().dept ? '<div class="chips small" role="group" aria-label="Flags from" style="margin-bottom:8px">' +
+      '<span class="sub" style="align-self:center">Flags from:</span>' +
+      '<button class="chip" data-flagscope="dept" aria-pressed="' + (S.flagScope === 'dept') + '">' + esc(filters().dept) + ' only</button>' +
+      '<button class="chip" data-flagscope="all" aria-pressed="' + (S.flagScope === 'all') + '">All courses</button></div>' +
+      '<div class="dist-note">' + (S.flagScope === 'dept'
+        ? 'Status, reasons, average, missing work and changes use only the student\'s ' + esc(filters().dept) + ' courses.'
+        : 'Status and reasons use all of the student\'s courses (a student flagged for another subject is listed too); ' +
+          'average, missing work and changes use only ' + esc(filters().dept) + ' courses.') + '</div>' : '') +
+    '<div class="chips">' + chip('all', 'All flagged') + chip('intervention', 'Needs intervention') + chip('attention', 'Needs attention') +
+    chip('declining', 'Declining') + chip('missing', minMissing + '+ missing') + '</div>' +
+    table('watch', [STUDENT_COLS.name, STUDENT_COLS.grade, STUDENT_COLS.homeroom, STUDENT_COLS.status, STUDENT_COLS.reasons,
+                    STUDENT_COLS.avg, STUDENT_COLS.dUpd, STUDENT_COLS.dSem, STUDENT_COLS.missing].concat(S.data.hasDrafts ? [STUDENT_COLS.drafts] : []),
+          list, { rowAttr: studentRowAttr, defaultSort: { key: 'status', dir: 1 } }) +
+    '<div class="sub" style="margin-top:8px">A flag is a prompt to look closer, not a judgement: grades can be low because work has not been graded yet.</div></section>';
+}
+
+/* =====================================================================
+   Department report (replaces the monthly departmental Sheet, retired 2026-10-06)
+   Class averages come from history.timeline: every grade update of every semester. Per department:
+     - average of class averages: each class counts once (the method the Sheet used)
+     - average of student grades: sum(class average x students) / sum(students)
+   On a column date every class counts with its latest update up to that date, so HS and JH being
+   updated on different days doesn't leave gaps. Classes marked "leave out" in the Departments tab
+   (Homeroom, Other by default) are not in the report.
+   ===================================================================== */
+var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function currentSemester() { return S.studentList.map(function (s) { return s.semester; }).sort(semesterOrder).pop() || ''; }
+function reportSemesters() { return Object.keys(S.series || {}).sort(semesterOrder); }
+function reportSemester() {
+  var sems = reportSemesters(), cur = currentSemester();
+  return S.deptSem && sems.indexOf(S.deptSem) !== -1 ? S.deptSem : sems.indexOf(cur) !== -1 ? cur : sems[sems.length - 1];
+}
+function schoolYearOf(sem) {
+  var m = /(\d{4})\s+(Spring|Fall)/i.exec(sem || '');
+  if (!m) return '';
+  var y = +m[1] - (/spring/i.test(m[2]) ? 1 : 0);
+  return y + '–' + String(y + 1).slice(2);
+}
+
+/**
+ * Classes of a semester that pass the filters. The current semester uses the normal course filters;
+ * earlier semesters only the section and department filters (grade level and homeroom aren't known
+ * for old classes).
+ */
+function reportClasses(sem, withLeftOut) {
+  var f = filters(), ok = null;
+  if (sem === currentSemester()) { ok = {}; filteredCourses().forEach(function (co) { ok[co.name] = true; }); }
+  return Object.keys((S.series || {})[sem] || {}).map(function (n) { return S.series[sem][n]; }).filter(function (cs) {
+    var ci = courseInfo(cs.name);
+    if (!withLeftOut && ci.leaveOut) return false;
+    if (ok) return !!ok[cs.name];
+    return (!f.section || cs.section === f.section) && (!f.dept || ci.dept === f.dept);
+  });
+}
+
+/** Columns: every update day, or the last update day of each month. */
+function reportColumns(classes, mode) {
+  var days = [];
+  classes.forEach(function (cs) { cs.pts.forEach(function (p) { if (days.indexOf(p.day) === -1) days.push(p.day); }); });
+  days.sort(natural);
+  if (classes.length && classes.every(function (cs) { return cs.archived; })) {   // archived semester: final grades only
+    return days.slice(-1).map(function (d) { return { key: d.slice(0, 7), end: d, label: 'Final', month: true }; });
+  }
+  if (mode !== 'month') return days.map(function (d) { return { key: d, end: d, label: shortDay(d), month: false }; });
+  var last = {};
+  days.forEach(function (d) { var m = d.slice(0, 7); if (!last[m] || d > last[m]) last[m] = d; });
+  return Object.keys(last).sort().map(function (m) {
+    return { key: m, end: last[m], label: MONTHS[+m.slice(5, 7) - 1] + ' ' + m.slice(2, 4), month: true };
+  });
+}
+function asOf(cs, end) {
+  var hit = null;
+  cs.pts.forEach(function (p) { if (p.day <= end) hit = p; });
+  return hit;
+}
+/** A class's own value in a column (no carrying forward): that update, or the month's last update. */
+function classValue(cs, col) {
+  var hit = null;
+  cs.pts.forEach(function (p) { if (col.month ? p.day.slice(0, 7) === col.key : p.day === col.key) hit = p; });
+  return hit;
+}
+/** Department figures on a date, every class as of its latest update up to then. */
+function deptPoint(classes, end) {
+  var pts = classes.map(function (cs) { return asOf(cs, end); }).filter(function (p) { return p && p.avg != null; });
+  var n = sum(pts.map(function (p) { return p.n; }));
+  var known = pts.filter(function (p) { return p.below != null; });   // archived classes: count below 60 unknown
+  return { classes: pts.length, n: n, below: known.length ? sum(known.map(function (p) { return p.below; })) : null,
+           avgClasses: mean(pts.map(function (p) { return p.avg; })),
+           avgStudents: n ? sum(pts.map(function (p) { return p.avg * p.n; })) / n : null };
+}
+/** Average of the department's monthly values (like the Sheet's "Fall 2025 Average"). */
+function deptSemesterAverage(classes) {
+  return mean(reportColumns(classes, 'month').map(function (c) { return deptPoint(classes, c.end).avgClasses; }));
+}
+/** School-year average: the department's monthly values of every semester of that year up to `sem`. */
+function deptYearAverage(dept, sem) {
+  var yr = schoolYearOf(sem), vals = [];
+  reportSemesters().forEach(function (s) {
+    if (schoolYearOf(s) !== yr || semesterOrder(s, sem) > 0) return;
+    var list = reportClasses(s).filter(function (cs) { return deptOf(cs.name) === dept; });
+    reportColumns(list, 'month').forEach(function (c) { vals.push(deptPoint(list, c.end).avgClasses); });
+  });
+  return mean(vals);
+}
+
+function deptSummaries(sem) {
+  var by = {}, cur = sem === currentSemester();
+  reportClasses(sem).forEach(function (cs) { var d = deptOf(cs.name); (by[d] = by[d] || []).push(cs); });
+  return Object.keys(by).sort(deptOrder).map(function (d) {
+    var list = by[d], cols = reportColumns(list, 'update');
+    var series = cols.map(function (c) { return deptPoint(list, c.end); });
+    var now = series[series.length - 1], prev = series.length > 1 ? series[series.length - 2] : null;
+    return {
+      dept: d, classes: list, now: now, sections: uniq(list.map(function (cs) { return cs.section; })).sort(natural),
+      change: prev && now.avgClasses != null && prev.avgClasses != null ? now.avgClasses - prev.avgClasses : null,
+      trend: series.map(function (p) { return p.avgClasses; }), semAvg: deptSemesterAverage(list),
+      yearAvg: deptYearAverage(d, sem),
+      missing: cur ? sum(list.map(function (cs) { return S.courses[cs.name] ? S.courses[cs.name].missing : 0; })) : null
+    };
+  });
+}
+
+function semesterChips(sem) {
+  return '<div class="chips small" role="group" aria-label="Semester">' + reportSemesters().map(function (s) {
+    return '<button class="chip" data-dsem="' + esc(s) + '" aria-pressed="' + (s === sem) + '">' + esc(s) + '</button>';
+  }).join('') + '</div>';
+}
+
+function renderDepartments() {
+  var sem = reportSemester();
+  if (!sem) return noData('No class averages yet.');
+  var cur = sem === currentSemester(), rows = deptSummaries(sem);
+  var leftOut = reportClasses(sem, true).filter(function (cs) { return courseInfo(cs.name).leaveOut; });
+  var leftBy = {};
+  leftOut.forEach(function (cs) { var d = deptOf(cs.name); leftBy[d] = (leftBy[d] || 0) + 1; });
+  var html = '<section class="panel"><div class="panel-head"><h3>Departments · ' + esc(sem) + '</h3>' + semesterChips(sem) + '</div>' +
+    '<div class="dist-note">Each department\'s classes ' + (cur ? 'as of their latest grade update' : 'at the end of the semester (last update)') +
+    '. <b>Average of class averages</b> counts every class once (the method of the old monthly departmental Sheet); ' +
+    '<b>average of student grades</b> counts every student grade, so bigger classes weigh more. ' +
+    (cur ? '' : 'Earlier semesters ignore the grade-level and homeroom filters. ') +
+    (S.session.isAll ? '' : 'Only the courses you can see are included. ') + 'Click a department for its classes month by month.</div>' +
+    table('depts-' + sem, [
+      { key: 'd', label: 'Department', get: function (r) { return DEPT_ORDER.indexOf(r.dept) === -1 ? 50 : DEPT_ORDER.indexOf(r.dept); },
+        html: function (r) { return '<button class="link" data-dept="' + esc(r.dept) + '">' + esc(r.dept) + '</button>'; } },
+      { key: 's', label: 'Sections', html: function (r) { return esc(r.sections.map(function (s) { return s === 'High School' ? 'HS' : s === 'Junior High' ? 'JH' : s; }).join(' + ')); } },
+      { key: 'c', label: 'Classes', num: true, get: function (r) { return r.now.classes; }, html: function (r) { return r.now.classes; } },
+      { key: 'ac', label: 'Avg of class averages', num: true, get: function (r) { return r.now.avgClasses; }, html: function (r) { return pill(r.now.avgClasses); } },
+      { key: 'as', label: 'Avg of student grades', num: true, get: function (r) { return r.now.avgStudents; }, html: function (r) { return pill(r.now.avgStudents); } },
+      { key: 'n', label: 'Student grades', num: true, title: 'One per student per class', get: function (r) { return r.now.n; }, html: function (r) { return r.now.n; } },
+      { key: 'b', label: 'Below 60', num: true, get: function (r) { return r.now.below; }, html: function (r) { return r.now.below == null ? '<span class="sub">—</span>' : r.now.below || '0'; } },
+      { key: 'ch', label: 'Since last update', num: true, title: 'Change in the average of class averages since the update before', get: function (r) { return r.change; }, html: function (r) { return delta(r.change); } },
+      { key: 't', label: 'Trend', html: function (r) { return sparkline(r.trend) || '<span class="sub">—</span>'; } },
+      { key: 'sa', label: 'Semester average', num: true, title: 'Average of the monthly values (as in the old Sheet)', get: function (r) { return r.semAvg; }, html: function (r) { return fmt(r.semAvg); } },
+      { key: 'ya', label: 'School year ' + schoolYearOf(sem), num: true, title: 'Average of the monthly values of this school year so far', get: function (r) { return r.yearAvg; }, html: function (r) { return fmt(r.yearAvg); } }
+    ].concat(cur ? [{ key: 'm', label: 'Missing', num: true, get: function (r) { return r.missing; }, html: function (r) { return r.missing || '0'; } }] : []),
+    rows, { defaultSort: { key: 'd', dir: 1 } }) +
+    (leftOut.length ? '<div class="sub" style="margin-top:8px">Not included (marked "leave out" in the Departments tab): ' +
+      esc(Object.keys(leftBy).sort(deptOrder).map(function (d) { return leftBy[d] + ' ' + d; }).join(', ')) + ' class' + (leftOut.length === 1 ? '' : 'es') + '.</div>' : '') +
+    '</section>';
+  return html;
+}
+
+/** One department: chart over the semester and every class month by month (or update by update). */
+function renderDept(dept) {
+  var sem = reportSemester(), cur = sem === currentSemester();
+  var classes = reportClasses(sem).filter(function (cs) { return deptOf(cs.name) === dept; })
+    .sort(function (a, b) { return natural(a.section + a.name, b.section + b.name); });
+  var head = crumbs() + '<div class="panel-head" style="margin:0"><h2>' + esc(dept) + '</h2>' + semesterChips(sem) + '</div>';
+  if (!classes.length) return head + noData('No classes of this department in ' + sem + ' (with these filters).');
+  var cols = reportColumns(classes, S.deptCols), upd = reportColumns(classes, 'update');
+  var now = deptPoint(classes, upd[upd.length - 1].end);
+  var semAvg = deptSemesterAverage(classes), yearAvg = deptYearAverage(dept, sem);
+  var html = head + '<div class="sub">' + esc(sem + (cur ? ' · as of the latest grade update' : ' · end of semester')) + '</div>' +
+    '<div class="tiles">' + tile(now.classes, 'Classes') +
+    tile(now.avgClasses == null ? '—' : now.avgClasses.toFixed(1) + '%', 'Average of class averages', 'each class counts once') +
+    tile(now.avgStudents == null ? '—' : now.avgStudents.toFixed(1) + '%', 'Average of student grades', now.n + ' student grades') +
+    tile(now.below == null ? '—' : now.below, 'Student grades below 60') +
+    tile(semAvg == null ? '—' : semAvg.toFixed(1) + '%', 'Semester average', 'average of the monthly values') +
+    tile(yearAvg == null ? '—' : yearAvg.toFixed(1) + '%', 'School year ' + schoolYearOf(sem), 'monthly values so far') + '</div>';
+
+  html += '<section class="panel"><div class="panel-head"><h3>Department average over the semester</h3><span class="sub">red line = 60%</span></div>' +
+    (upd.length >= 2 ? lineChart({ title: dept + ' average', ref: 60, labels: upd.map(function (c) { return c.label; }),
+      series: [
+        { name: 'Average of class averages', color: 'var(--series-1)', values: upd.map(function (c) { return deptPoint(classes, c.end).avgClasses; }) },
+        { name: 'Average of student grades', color: 'var(--series-2)', values: upd.map(function (c) { return deptPoint(classes, c.end).avgStudents; }),
+          notes: upd.map(function (c) { var p = deptPoint(classes, c.end); return '(' + p.classes + ' classes, ' + p.n + ' grades)'; }) }] })
+     : '<div class="empty">The trend appears after the next grade update.</div>') + '</section>';
+
+  if (cur) html += deptCategoriesPanel(classes, now);
+  // The retired monthly Sheet's department averages (typed by hand) for this department and semester, if any.
+  var sheetRows = (S.past && S.past.sheet || []).filter(function (r) {
+    var d = r[0], y = +d.slice(0, 4), mo = +d.slice(5, 7);
+    var s = mo === 1 ? (y - 1) + ' Fall' : mo >= 8 ? y + ' Fall' : y + ' Spring';
+    return r[2] === dept && s === sem && r[3] != null;
+  });
+  if (sheetRows.length) {
+    html += '<section class="panel"><div class="panel-head"><h3>Old monthly Sheet</h3><span class="sub">department averages typed by hand (retired)</span></div>' +
+      '<div class="dist-note">For months before the first grade update in this database. These were typed in by hand and often differ from ' +
+      'Classroom (see compare_archived_grades.py); the figures above come from Classroom.</div><div class="chips small">' +
+      sheetRows.map(function (r) { return '<span class="chip">' + esc(r[1]) + ': <b>' + r[3].toFixed(1) + '</b></span>'; }).join('') + '</div></section>';
+  }
+  var data = deptTableData(dept, sem, classes, cols);
+  html += '<section class="panel"><div class="panel-head"><h3>Classes</h3>' +
+    '<div class="chips small" role="group" aria-label="Columns">' +
+    '<button class="chip" data-dcols="month" aria-pressed="' + (S.deptCols === 'month') + '">Monthly</button>' +
+    '<button class="chip" data-dcols="update" aria-pressed="' + (S.deptCols === 'update') + '">Every update</button></div>' +
+    '<div class="chips small" role="group" aria-label="Sections">' +
+    '<button class="chip" data-dcombine="no" aria-pressed="' + !S.deptCombine + '">Each section</button>' +
+    '<button class="chip" data-dcombine="yes" aria-pressed="' + S.deptCombine + '">Sections combined</button></div>' +
+    '<div class="chips small"><button class="chip" data-export="csv">Download CSV</button><button class="chip" data-export="copy">Copy for Sheets</button></div></div>' +
+    '<div class="dist-note">' + (S.deptCols === 'month' ? 'Each month shows the last grade update of that month' : 'One column per grade update') +
+    '. "Biggest change" is the largest jump between two neighbouring columns; "Semester average" is the average of the columns (as in the old Sheet). ' +
+    'The department rows count every class as of its latest update up to that date' +
+    (S.deptCombine ? '. Combined rows join the sections of one course (same name without the section letter), ' +
+      'averaging all their students; the department rows still count each section once' : '') + '.</div>' +
+    '<div class="table-wrap"><table class="dept-table"><thead><tr>' + data.header.map(function (h, i) {
+      return '<th class="' + (i >= 3 ? 'num' : '') + '">' + esc(h) + '</th>';
+    }).join('') + '</tr></thead><tbody>' + data.rows.map(function (r) {
+      var cs = r.cs, link = cur && S.courses[cs.name];
+      return '<tr' + (link ? ' class="click" data-course="' + esc(cs.name) + '"' : '') + '><td class="wrap"' +
+        (cs.members ? ' title="' + esc(cs.members.join(' + ')) + '"' : '') + '>' + esc(cs.name) + '</td><td>' +
+        esc(cs.section === 'High School' ? 'HS' : cs.section === 'Junior High' ? 'JH' : cs.section) + '</td><td class="sub">' +
+        esc(cs.code || courseInfo(cs.name).code) + '</td>' + r.cells.map(function (v, i) {
+          var last = r.cells.length - 1;
+          var html = v == null ? '<span class="sub">—</span>'
+            : i === 0 ? String(v)                        // students
+            : i === last - 1 ? v.toFixed(1)              // biggest change
+            : i === last ? fmt(v) : fmtCell(v);           // semester average / one column
+          return '<td class="num">' + html + '</td>';
+        }).join('') + '</tr>';
+    }).join('') + '</tbody><tfoot>' + data.foot.map(function (r) {
+      return '<tr><th colspan="3">' + esc(r.label) + '</th>' + r.cells.map(function (v) { return '<th class="num">' + (v == null ? '—' : v.toFixed(1)) + '</th>'; }).join('') + '</tr>';
+    }).join('') + '</tfoot></table></div></section>';
+  return html;
+}
+function fmtCell(v) { return '<span class="pill ' + band(v) + '">' + v.toFixed(1) + '</span>'; }
+
+/** The class table as plain numbers (shared by the page and the CSV / copy export). */
+/**
+ * Grading categories of a department's classes, grouped into families (category_groups.py on the
+ * grades computer): per family the average across classes (each class once), how many classes use
+ * it, the range of weights, and the difference from the department's average of class averages.
+ */
+function deptCategoriesPanel(classes, now) {
+  var cs = S.data.catSummary || {}, fam = {};
+  classes.forEach(function (c) {
+    (cs[c.name] || []).forEach(function (r) {
+      if (r[2] == null) return;
+      var f = fam[r[0]] || (fam[r[0]] = { name: r[0], avgs: [], weights: [], classes: [] });
+      f.avgs.push(r[2]); f.weights.push(r[1] || 0); f.classes.push(c.name);
+    });
+  });
+  var rows = Object.keys(fam).map(function (k) {
+    var f = fam[k];
+    return { name: f.name, avg: mean(f.avgs), n: f.avgs.length, wmin: Math.min.apply(null, f.weights), wmax: Math.max.apply(null, f.weights),
+             diff: now.avgClasses == null ? null : mean(f.avgs) - now.avgClasses, classes: f.classes };
+  });
+  if (!rows.length) return '';
+  var ranked = rows.filter(function (r) { return r.n >= 2 && r.name !== 'No category'; }).sort(function (a, b) { return b.avg - a.avg; });
+  var summary = ranked.length >= 2 ? esc(ranked[ranked.length - 1].name) + ' average ' + Math.abs(ranked[0].avg - ranked[ranked.length - 1].avg).toFixed(1) +
+    ' points below ' + esc(ranked[0].name) + ' (families used by at least 2 classes). ' : '';
+  return '<section class="panel"><div class="panel-head"><h3>Grading categories</h3><span class="sub">this semester · each class counts once</span></div>' +
+    '<div class="dist-note">' + summary + 'Teachers name categories in many ways ("Participation & Citizenship", "C&P", "課堂表現"…), so they are ' +
+    'grouped into families. Weights are the share of the overall grade each class gives the family. "No category" work counts only ' +
+    'in classes graded by total points.</div>' +
+    table('dcat', [
+      { key: 'f', label: 'Category family', get: function (r) { return r.name; }, html: function (r) {
+        return '<span title="' + esc(r.classes.join(', ')) + '">' + esc(r.name) + '</span>'; } },
+      { key: 'n', label: 'Classes', num: true, get: function (r) { return r.n; }, html: function (r) { return r.n; } },
+      { key: 'a', label: 'Average', num: true, get: function (r) { return r.avg; }, html: function (r) { return pill(r.avg); } },
+      { key: 'd', label: 'vs department', num: true, title: 'Difference from the department\'s average of class averages',
+        get: function (r) { return r.diff; }, html: function (r) { return delta(r.diff); } },
+      { key: 'w', label: 'Weight', num: true, get: function (r) { return r.wmax; }, html: function (r) {
+        return r.wmax ? (r.wmin === r.wmax ? r.wmax.toFixed(0) : r.wmin.toFixed(0) + '–' + r.wmax.toFixed(0)) + '%' : '<span class="sub">—</span>'; } }
+    ], rows, { defaultSort: { key: 'n', dir: -1 } }) + '</section>';
+}
+
+/**
+ * "Combine sections": the sections of one course (same course key, same HS/JH) as one row. On each
+ * update day the combined value is the average of all their students (sections weighted by size).
+ */
+function combineSections(classes) {
+  var groups = {}, order = [];
+  classes.forEach(function (cs) {
+    var k = cs.section + '\u0001' + courseInfo(cs.name).key.toLowerCase();
+    if (!groups[k]) { groups[k] = []; order.push(k); }
+    groups[k].push(cs);
+  });
+  return order.map(function (k) {
+    var list = groups[k];
+    if (list.length === 1) return list[0];
+    var byDay = {};
+    list.forEach(function (cs) {
+      cs.pts.forEach(function (p) {
+        if (p.avg == null) return;
+        var d = byDay[p.day] || (byDay[p.day] = { day: p.day, sum: 0, n: 0, below: 0, belowKnown: false, final: p.final });
+        d.sum += p.avg * (p.n || 1); d.n += p.n || 1;
+        if (p.below != null) { d.below += p.below; d.belowKnown = true; }
+      });
+    });
+    var pts = Object.keys(byDay).sort(natural).map(function (day) {
+      var d = byDay[day];
+      return { day: day, avg: d.sum / d.n, n: d.n, below: d.belowKnown ? d.below : null, final: d.final };
+    });
+    return { name: courseInfo(list[0].name).key + ' (' + list.length + ' sections)', section: list[0].section,
+             semester: list[0].semester, archived: list[0].archived, pts: pts, code: courseInfo(list[0].name).code,
+             members: list.map(function (cs) { return cs.name; }) };
+  });
+}
+
+function deptTableData(dept, sem, classes, cols) {
+  var header = ['Class', 'Section', 'Ontario code', 'Students'].concat(cols.map(function (c) { return c.label; }), ['Biggest change', 'Semester average']);
+  // The department rows below always count every class separately (each class once), combined or not.
+  var rowClasses = S.deptCombine ? combineSections(classes) : classes;
+  var rows = rowClasses.map(function (cs) {
+    var vals = cols.map(function (c) { var p = classValue(cs, c); return p ? p.avg : null; });
+    var seen = vals.filter(function (v) { return v != null; }), big = null;
+    for (var i = 1; i < seen.length; i++) big = Math.max(big || 0, Math.abs(seen[i] - seen[i - 1]));
+    var last = cs.pts[cs.pts.length - 1];
+    return { cs: cs, cells: [last ? last.n : null].concat(vals, [big, mean(seen)]) };
+  });
+  var pts = cols.map(function (c) { return deptPoint(classes, c.end); });
+  var foot = [
+    { label: 'Department: average of class averages', cells: [null].concat(pts.map(function (p) { return p.avgClasses; }), [null, mean(pts.map(function (p) { return p.avgClasses; }))]) },
+    { label: 'Department: average of student grades', cells: [null].concat(pts.map(function (p) { return p.avgStudents; }), [null, mean(pts.map(function (p) { return p.avgStudents; }))]) }
+  ];
+  return { header: header, rows: rows, foot: foot };
+}
+
+/** Download the department's class table as CSV, or copy it (tab-separated) for pasting into Sheets. */
+function exportDept(kind, btn) {
+  var dept = S.page && S.page.type === 'dept' ? S.page.id : null;
+  if (!dept) return;
+  var sem = reportSemester();
+  var classes = reportClasses(sem).filter(function (cs) { return deptOf(cs.name) === dept; })
+    .sort(function (a, b) { return natural(a.section + a.name, b.section + b.name); });
+  var data = deptTableData(dept, sem, classes, reportColumns(classes, S.deptCols));
+  var num = function (v) { return v == null ? '' : (Math.round(v * 10) / 10).toString(); };
+  var lines = [data.header].concat(data.rows.map(function (r) {
+    return [r.cs.members ? r.cs.name + ': ' + r.cs.members.join(' + ') : r.cs.name, r.cs.section,
+            r.cs.code || courseInfo(r.cs.name).code].concat(r.cells.map(num));
+  }), data.foot.map(function (r) { return [r.label, '', ''].concat(r.cells.map(num)); }));
+  var label = btn.textContent;
+  var done = function (msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = label; }, 2000); };
+  if (kind === 'copy') {
+    var tsv = lines.map(function (l) { return l.map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t'); }).join('\n');
+    var ta = document.createElement('textarea');
+    ta.value = tsv; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return done(ok ? 'Copied: paste into a Sheet' : 'Copy blocked by the browser');
+  }
+  var csv = lines.map(function (l) { return l.map(function (v) {
+    v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }).join(','); }).join('\r\n');
+  try {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = dept.replace(/[\\/:*?"<>|]/g, '-') + ' - ' + sem + ' - department report.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    done('Downloaded');
+  } catch (e) { done('Download blocked: use Copy'); }
+}
+
+/* =====================================================================
+   Past grades: every earlier semester in the database (final snapshot of each class), the imported
+   Classroom archive (older classes, any account's export) and transcript letter grades.
+   ===================================================================== */
+function loadPast() {
+  call('getPastIndex').then(function (idx) {
+    S.past = idx;
+    addArchivedClasses(idx.classes || []);
+    if (S.tab === 'past' || S.tab === 'depts' || (S.page && S.page.type === 'dept')) render();
+  }).catch(function (err) {
+    S.past = { allowed: false, error: (err && err.message) || String(err), students: [], classes: [], sheet: [] };
+    if (S.tab === 'past') render();
+  });
+}
+
+/** Archived classes of semesters without update-by-update data join the department report as one "final" value. */
+function addArchivedClasses(classes) {
+  var have = {};
+  Object.keys(S.series || {}).forEach(function (sem) { have[sem] = true; });
+  classes.forEach(function (c) {
+    var name = c[0], sem = c[1], avg = c[3];
+    if (have[sem] || avg == null) return;
+    var m = /(\d{4})\s+(Spring|Fall)/i.exec(sem || '');
+    if (!m) return;
+    var day = /fall/i.test(m[2]) ? m[1] + '-12-31' : m[1] + '-06-30';
+    var bySem = S.series[sem] || (S.series[sem] = {});
+    bySem[name] = { name: name, section: c[2] || '', semester: sem, archived: true,
+                    pts: [{ day: day, avg: avg, n: c[4] || 0, below: null, final: true }] };
+  });
+}
+
+function pastSearchKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9㐀-鿿]+/g, ' ').trim(); }
+
+function renderPast() {
+  if (!S.past) return '<div class="msg"><div class="spinner"></div>Loading past grades…</div>';
+  if (!S.past.allowed) return noData(S.past.error ? 'Past grades could not be loaded: ' + S.past.error : 'Past grades are not available for your role.');
+  if (S.pastSid) return renderPastStudent(S.pastSid);
+  var f = filters(), q = pastSearchKey(f.q), words = q ? q.split(' ') : [];
+  var list = S.past.students.filter(function (r) {
+    if (f.section && r[2] && r[2] !== f.section) return false;
+    var hay = pastSearchKey(r[1]);
+    return words.every(function (w) { return hay.indexOf(w) !== -1; });
+  });
+  var shown = q ? list : list.filter(function (r) { return !S.students[r[0]]; });
+  var html = '<section class="panel"><div class="panel-head"><h3>Past grades</h3><span class="sub">' +
+    S.past.students.length + ' students with grades from earlier semesters</span></div>' +
+    '<div class="dist-note">Type a name in the search box above to find any student, including students who have left. ' +
+    'Final grades come from the last grade update of each semester' + (S.past.classes.some(function (c) { return c[5] === 'archive'; })
+      ? ' and from archived Google Classroom classes' : '') + ', calculated the same way as the grade reports' +
+    (S.past.students.length ? '' : '') + '. Transcript letter grades are shown next to them where the school has them.' +
+    (q ? '' : ' Without a search, the list shows students who are no longer in the current data.') + '</div>' +
+    table('past-list', [
+      { key: 'n', label: 'Student', get: function (r) { return r[1]; }, html: function (r) {
+        return '<button class="link" data-pastsid="' + esc(r[0]) + '">' + esc(r[1] || '(no name)') + '</button>' +
+          (S.students[r[0]] ? ' <span class="tag">current</span>' : ''); } },
+      { key: 's', label: 'Section', get: function (r) { return r[2]; }, html: function (r) { return esc(r[2] || '—'); } },
+      { key: 'f', label: 'From', get: function (r) { return semesterSortKey(r[3]); }, html: function (r) { return esc(r[3] || ''); } },
+      { key: 'l', label: 'Last semester', get: function (r) { return semesterSortKey(r[4]); }, html: function (r) { return esc(r[4] || ''); } },
+      { key: 'g', label: 'Past grades', num: true, get: function (r) { return r[5]; }, html: function (r) { return r[5]; } }
+    ], shown, { rowAttr: function (r) { return 'data-pastsid="' + esc(r[0]) + '"'; }, defaultSort: { key: 'n', dir: 1 }, limit: 60 }) + '</section>';
+  return html;
+}
+function semesterSortKey(s) { var m = /(\d{4})\s+(Spring|Fall)/i.exec(s || ''); return m ? +m[1] * 2 + (/fall/i.test(m[2]) ? 1 : 0) : 0; }
+
+function renderPastStudent(sid) {
+  var idxRow = S.past.students.filter(function (r) { return r[0] === sid; })[0];
+  var cur = S.students[sid];
+  var head = '<div class="crumbs"><button class="link" data-pastback>← Past grades</button></div>';
+  var d = S.pastDetail[sid];
+  if (!d) {
+    call('getPastGrades', sid).then(function (res) {
+      S.pastDetail[sid] = res;
+      if (S.tab === 'past' && S.pastSid === sid) render();
+    }).catch(handleError);
+    return head + '<div class="msg"><div class="spinner"></div>Loading…</div>';
+  }
+  var name = d.n || (idxRow && idxRow[1]) || (cur && cur.name) || sid;
+  var bySem = {};
+  d.g.forEach(function (g) { (bySem[g[0]] = bySem[g[0]] || []).push(g); });
+  var sems = Object.keys(bySem).sort(semesterOrder);
+  var semAvg = function (rows) { return mean(rows.map(function (g) { return g[2]; })); };
+  var clsAvg = function (rows) { return mean(rows.filter(function (g) { return g[2] != null; }).map(function (g) { return g[4]; })); };
+  var all = d.g.filter(function (g) { return g[2] != null; });
+  var vsClass = mean(all.filter(function (g) { return g[4] != null; }).map(function (g) { return g[2] - g[4]; }));
+
+  var html = head + '<h2>' + esc(name) + '</h2><div class="sub">' + esc([idxRow && idxRow[2], cur ? 'current student, ' + cur.grade : 'not in the current data']
+      .filter(Boolean).join(' · ')) + (cur ? ' · <button class="link" data-student="' + esc(sid) + '">Open this semester\'s page</button>' : '') + '</div>' +
+    '<div class="tiles">' + tile(sems.length, 'Earlier semesters', sems.length ? sems[0] + ' – ' + sems[sems.length - 1] : '') +
+    tile(all.length ? mean(all.map(function (g) { return g[2]; })).toFixed(1) + '%' : '—', 'Average of past final grades', all.length + ' course grades') +
+    tile(vsClass == null ? '—' : (vsClass >= 0 ? '+' : '') + vsClass.toFixed(1), 'Compared with class averages', 'points above (+) or below (−) the class') +
+    tile(cur && cur.avg != null ? cur.avg.toFixed(1) + '%' : '—', 'This semester so far', cur ? 'counted courses' : 'not enrolled now') + '</div>';
+
+  if (sems.length) {
+    var labels = sems.slice(), own = sems.map(function (s) { return semAvg(bySem[s]); }), cls = sems.map(function (s) { return clsAvg(bySem[s]); });
+    if (cur && cur.avg != null) { labels.push(cur.semester + ' (now)'); own.push(cur.avg); cls.push(mean(cur.courses.map(function (c) { return S.courses[c.course] ? S.courses[c.course].avg : null; }))); }
+    html += '<section class="panel"><div class="panel-head"><h3>Average by semester</h3><span class="sub">final grades · red line = 60%</span></div>' +
+      (labels.length >= 2 ? lineChart({ title: 'Average by semester', ref: 60, labels: labels, series: [
+        { name: name, color: 'var(--series-1)', values: own },
+        { name: 'Average of the same classes', color: 'var(--series-2)', values: cls }] })
+       : '<div class="empty">One semester so far: ' + fmt(own[0]) + '% (class average ' + fmt(cls[0]) + '%).</div>') + '</section>';
+  }
+  sems.slice().reverse().forEach(function (s) {
+    var rows = bySem[s];
+    html += '<section class="panel"><div class="panel-head"><h3>' + esc(s) + '</h3><span class="sub">average ' + fmt(semAvg(rows)) +
+      '% · ' + rows.length + ' classes</span></div>' + table('past-' + sid + s, [
+        { key: 'c', label: 'Class', get: function (g) { return g[1]; }, html: function (g) { return esc(g[1]); } },
+        { key: 'd', label: 'Department', get: function (g) { return deptOf(g[1]); }, html: function (g) { return esc(deptOf(g[1])); } },
+        { key: 'f', label: 'Final grade', num: true, get: function (g) { return g[2]; },
+          html: function (g) { return g[2] == null && g[3] != null ? '<span class="sub" title="No overall grade shown in Classroom; calculated value">(' + g[3].toFixed(1) + ')</span>' : pill(g[2]); } },
+        { key: 'a', label: 'Class average', num: true, get: function (g) { return g[4]; }, html: function (g) { return fmt(g[4]); } },
+        { key: 'v', label: 'vs class', num: true, get: function (g) { return g[2] != null && g[4] != null ? g[2] - g[4] : null; },
+          html: function (g) { return g[2] != null && g[4] != null ? delta(g[2] - g[4]) : '<span class="sub">—</span>'; } },
+        { key: 's', label: 'Source', get: function (g) { return g[5]; }, html: function (g) { return '<span class="sub">' + esc(g[5]) + '</span>'; } }
+      ], rows, { defaultSort: { key: 'c', dir: 1 } }) + '</section>';
+  });
+  if (d.t.length) {
+    html += '<section class="panel"><div class="panel-head"><h3>Transcript grades</h3><span class="sub">official letter grades from the school\'s transcripts</span></div>' +
+      table('past-t-' + sid, [
+        { key: 's', label: 'Semester', get: function (t) { return semesterSortKey(t[0]); }, html: function (t) { return esc(t[0]); } },
+        { key: 'u', label: 'Subject', get: function (t) { return t[1]; }, html: function (t) { return esc(t[1]); } },
+        { key: 'g', label: 'Grade', get: function (t) { return t[2]; }, html: function (t) { return '<b>' + esc(t[2]) + '</b>'; } },
+        { key: 'c', label: 'Credit', num: true, get: function (t) { return parseFloat(t[3]); }, html: function (t) { return esc(t[3]); } }
+      ], d.t, { defaultSort: { key: 's', dir: -1 } }) + '</section>';
+  }
+  if (!sems.length && !d.t.length) html += noData('No past grades for this student.');
+  return html;
+}
+
+/** Count of draft grades (graded, not returned yet), as a tag. */
+function draftTag(n) {
+  return n ? '<span class="tag" title="Graded by the teacher but not returned yet, so not in the grade">' + n + ' not returned</span>' : '<span class="sub">0</span>';
+}
+
+/** Department label of a course; "suggested" until the dean confirms it in the Departments tab. */
+function deptTag(co) {
+  return '<span class="tag" title="' + esc(co.deptSuggested ? 'Suggested department: not yet in the Departments tab of the access Sheet'
+    : 'From the Departments tab of the access Sheet') + '">' + esc(co.dept) + (co.deptSuggested ? '*' : '') + '</span>';
+}
+
+function renderCourses() {
+  var courses = filteredCourses();
+  if (!courses.length) return noData('No courses match.');
+  return '<div class="sub" style="margin-bottom:10px">' + courses.length + ' courses</div><div class="grid">' + courses.map(function (c) {
+    return '<button class="card" data-course="' + esc(c.name) + '"><div class="card-title">' + esc(c.name) + '</div>' +
+      '<div class="card-stats">' + deptTag(c) + '<span>' + c.n + ' students</span>' + pill(c.avg, 'Overall grade hidden in Classroom') +
+      sparkline(c.timeline.map(function (t) { return t.avg; })) +
+      (c.below60 ? '<span class="pill g-bad">' + c.below60 + ' below 60</span>' : '') +
+      (c.missing ? '<span class="tag missing">' + c.missing + ' missing</span>' : '') + '</div></button>';
+  }).join('') + '</div>';
+}
+
+function renderStudents() {
+  var students = filteredStudents(false);
+  if (!S.studentList.length) return noData();
+  return '<section class="panel"><div class="panel-head"><h3>' + students.length + ' students</h3><span class="sub">click a student for details</span></div>' +
+    table('students', [STUDENT_COLS.name, STUDENT_COLS.grade, STUDENT_COLS.homeroom, STUDENT_COLS.avg, STUDENT_COLS.dUpd,
+                       STUDENT_COLS.dSem, STUDENT_COLS.missing].concat(S.data.hasDrafts ? [STUDENT_COLS.drafts] : [],
+                       [STUDENT_COLS.below, STUDENT_COLS.lowest, STUDENT_COLS.status]),
+          students, { rowAttr: studentRowAttr, defaultSort: { key: 'name', dir: 1 } }) + '</section>';
+}
+
+function crumbs() {
+  var prev = S.back.length ? S.back[S.back.length - 1] : null;
+  var label = prev ? (prev.type === 'course' || prev.type === 'dept' ? prev.id : S.students[prev.id] ? S.students[prev.id].name : 'Back')
+                   : ({ overview: 'Overview', watch: 'Watch list', courses: 'Courses', depts: 'Departments', students: 'Students',
+                        past: 'Past grades', about: 'How it works' })[S.tab];
+  return '<div class="crumbs"><button class="link" data-back>← ' + esc(label) + '</button></div>';
+}
+
+function renderCourse(name) {
+  var co = S.courses[name];
+  if (!co) return crumbs() + noData('This course is not in the latest data.');
+  var grades = co.rows.map(function (x) { return x.c.grade; });
+  var html = crumbs() + '<h2>' + esc(co.name) + '</h2><div class="sub">' + esc(co.section + ' · ' + co.semester + ' · ' +
+    co.grades.join(', ')) + ' · ' + deptTag(co) + (co.code ? ' <span class="tag" title="Ontario course code">' + esc(co.code) + '</span>' : '') + '</div>' +
+    '<div class="tiles">' + tile(co.n, 'Students') +
+    tile(co.avg == null ? 'Hidden' : co.avg.toFixed(1) + '%', 'Class average', co.median == null ? 'no overall grade in Classroom' : 'median ' + co.median.toFixed(1) + '%') +
+    tile(co.below60, 'Below 60%') + tile(co.missing, 'Missing assignments') + tile(co.late, 'Late submissions') +
+    (S.data.hasDrafts ? tile(co.drafts, 'Graded, not returned', 'draft grades, not in the averages yet') : '') + '</div>';
+
+  var shown = grades.filter(function (g) { return g != null; }).length;
+  html += '<div class="cols"><section class="panel"><div class="panel-head"><h3>Grade distribution</h3>' + distModeChips() + '</div>' +
+    '<div class="dist-note">One course grade per student in this class (' + shown + ' of ' + co.n + ' students have a grade).</div>' +
+    distribution({ cur: grades, prev: null, unit: 'students', curLabel: co.semester }) + '</section>' +
+    '<section class="panel"><div class="panel-head"><h3>Class average this semester</h3><span class="sub">each grade update</span></div>' +
+    (co.timeline.length >= 2 ? lineChart({ title: 'Class average', ref: 60,
+       labels: co.timeline.map(function (t) { return shortDay(t.day); }),
+       series: [{ name: 'Class average', color: 'var(--series-1)', values: co.timeline.map(function (t) { return t.avg; }),
+                  notes: co.timeline.map(function (t) { return '(' + t.n + ' students, ' + t.below + ' below 60)'; }) }] })
+     : '<div class="empty">The trend appears after the next grade update' + (co.timeline.length ? ' (one update so far: ' + shortDay(co.timeline[0].day) + ')' : '') + '.</div>') +
+    '</section></div>';
+
+  var detail = S.courseDetail[name];
+  if (!detail) {
+    html += '<section class="panel"><div class="empty">Loading categories and assignments…</div></section>';
+    call('getCourseDetail', name).then(function (d) {
+      S.courseDetail[name] = d;
+      if (S.page && S.page.type === 'course' && S.page.id === name) render();
+    }).catch(handleError);
+  } else {
+    html += '<div class="cols"><section class="panel"><div class="panel-head"><h3>Category averages</h3><span class="sub">weight in brackets</span></div>' +
+      (detail.cats.length ? detail.cats.map(function (c) {
+        return '<div class="cat"><div>' + esc(c[0]) + (c[1] ? ' <span class="sub">(' + c[1] + '%)</span>' : '') + '</div><div class="bar"><div style="width:' +
+          Math.max(0, Math.min(100, c[2] || 0)) + '%"></div></div><div>' + pill(c[2]) + '</div></div>';
+      }).join('') : '<div class="empty">No categories.</div>') + '</section>' +
+      (!S.showDetail ? detailGate('Assignments') :
+      '<section class="panel"><div class="panel-head"><h3>Assignments</h3>' + detailToggle('lowest class average first') + '</div>' +
+      table('asg-' + name, [
+        { key: 't', label: 'Assignment', wrap: true, get: function (a) { return a[0]; }, html: function (a) { return esc(a[0]) + ' <span class="sub">' + esc(a[1]) + '</span>'; } },
+        { key: 'avg', label: 'Average', num: true, get: function (a) { return a[3]; }, html: function (a) { return pill(a[3]); } },
+        { key: 'g', label: 'Graded', num: true, get: function (a) { return a[4] / (a[5] || 1); }, html: function (a) { return a[4] + '/' + a[5]; } },
+        { key: 'm', label: 'Missing', num: true, get: function (a) { return a[6]; }, html: function (a) { return a[6] ? '<span class="tag missing">' + a[6] + '</span>' : '0'; } },
+        { key: 'l', label: 'Late', num: true, get: function (a) { return a[7]; }, html: function (a) { return a[7] || '0'; } }
+      ].concat(S.data.hasDrafts ? [{ key: 'dr', label: 'Not returned', num: true, title: 'Students with a draft grade (graded, not returned yet)',
+        get: function (a) { return a[8] || 0; }, html: function (a) { return draftTag(a[8]); } }] : []), detail.asg, { defaultSort: { key: 'avg', dir: 1 }, limit: 25 }) + '</section>') + '</div>';
+  }
+
+  var rows = co.rows.map(function (x) { return x; });
+  html += '<section class="panel"><div class="panel-head"><h3>Students</h3></div>' + table('course-' + name, [
+    { key: 'name', label: 'Student', get: function (x) { return x.st.name; }, html: function (x) { return esc(x.st.name); } },
+    { key: 'gl', label: 'Grade', get: function (x) { return x.st.grade; }, html: function (x) { return esc(x.st.grade.replace('Grade ', 'G')); } },
+    { key: 'g', label: 'Course grade', num: true, get: function (x) { return x.c.grade; }, html: function (x) { return coursePill(x.c); } },
+    { key: 'd', label: 'Since last update', num: true, get: function (x) { return x.c.delta; }, html: function (x) { return delta(x.c.delta); } },
+    { key: 'sp', label: 'Trend', html: function (x) { return sparkline(x.c.trend.map(function (t) { return t.g; })); } },
+    { key: 'm', label: 'Missing', num: true, get: function (x) { return x.c.missing; }, html: function (x) { return x.c.missing ? '<span class="tag missing">' + x.c.missing + '</span>' : '0'; } },
+    { key: 'l', label: 'Late', num: true, get: function (x) { return x.c.late; }, html: function (x) { return x.c.late || '0'; } }
+  ].concat(S.data.hasDrafts ? [{ key: 'dr', label: 'Not returned', num: true, title: 'Graded by the teacher but not returned yet (draft grades)',
+    get: function (x) { return x.c.drafts; }, html: function (x) { return draftTag(x.c.drafts); } }] : [], [
+    { key: 's', label: 'Overall status', title: 'Across all of the student\'s courses you can see', get: function (x) { return STATUS[x.st.status].rank; }, html: function (x) { return statusBadge(x.st.status); } }
+  ]), rows, { rowAttr: function (x) { return 'data-student="' + esc(x.st.id) + '"'; }, defaultSort: { key: 'name', dir: 1 } }) + '</section>';
+  return html;
+}
+
+function renderStudent(sid) {
+  var st = S.students[sid];
+  if (!st) return crumbs() + noData('This student is not in the latest data.');
+  var html = crumbs() + '<h2>' + esc(st.name) + '</h2><div class="sub">' +
+    esc([st.grade, st.homeroom, st.section, st.email].filter(Boolean).join(' · ')) + '</div>' +
+    '<div style="margin-top:8px">' + statusBadge(st.status) + (st.reasons.length ? ' <span class="reasons">' + esc(st.reasons.join(' · ')) + '</span>' : '') + '</div>' +
+    '<div class="tiles">' + tile(st.avg == null ? '—' : st.avg.toFixed(1) + '%', 'Average', st.courses.length + ' courses' + (S.session.isAll ? '' : ' you can see')) +
+    tile(st.deltaUpdate == null ? '—' : (st.deltaUpdate >= 0 ? '+' : '') + st.deltaUpdate.toFixed(1), 'Since last update', 'same courses') +
+    tile(st.lastSem && st.lastSem.avg != null ? st.lastSem.avg.toFixed(1) + '%' : '—', 'Last semester', st.lastSem ? st.lastSem.semester + ' final' : 'no earlier data') +
+    tile(st.missing, 'Missing assignments') + tile(st.late, 'Late submissions') + '</div>';
+
+  html += '<div class="cols"><section class="panel"><div class="panel-head"><h3>Average over time</h3><span class="sub">red line = 60%</span></div>' +
+    trendChart([{ name: st.name, color: 'var(--series-1)', students: [st] }], 'Average over time') + '</section>' +
+    '<section class="panel"><div class="panel-head"><h3>Earlier semesters</h3><span class="sub">final grades' +
+    (S.past && S.past.allowed ? ' · <button class="link" data-pastsid="' + esc(sid) + '">All past grades</button>' : '') + '</span></div>' +
+    (st.past.length ? st.past.slice().reverse().map(function (ps) {
+      return '<details><summary>' + esc(ps.semester) + ' · average ' + fmt(ps.avg) + '% · ' + ps.courses.length + ' courses</summary>' +
+        '<div class="table-wrap"><table><tbody>' + ps.courses.slice().sort(function (a, b) { return natural(a.course, b.course); }).map(function (c) {
+          return '<tr><td>' + esc(c.course) + '</td><td class="num">' + pill(c.g) + '</td></tr>';
+        }).join('') + '</tbody></table></div></details>';
+    }).join('') : '<div class="empty">No earlier semesters in the database' + (S.session.isAll ? '' : ' for your courses') + '.</div>') +
+    '</section></div>' +
+    '<section class="panel"><div class="panel-head"><h3>Courses this semester</h3></div>' +
+    table('st-' + sid, [
+      { key: 'c', label: 'Course', get: function (c) { return c.course; }, html: function (c) { return '<button class="link" data-course="' + esc(c.course) + '">' + esc(shortCourse(c.course)) + '</button>'; } },
+      { key: 'g', label: 'Grade', num: true, get: function (c) { return c.grade; }, html: function (c) { return coursePill(c); } },
+      { key: 'd', label: 'Change', num: true, get: function (c) { return c.delta; }, html: function (c) { return delta(c.delta); } },
+      { key: 'sp', label: 'Trend', html: function (c) { return sparkline(c.trend.map(function (t) { return t.g; })); } },
+      { key: 'm', label: 'Missing', num: true, get: function (c) { return c.missing; }, html: function (c) { return c.missing ? '<span class="tag missing">' + c.missing + '</span>' : '0'; } }
+    ].concat(S.data.hasDrafts ? [{ key: 'dr', label: 'Not returned', num: true, title: 'Graded by the teacher but not returned yet (draft grades); not in this grade',
+      get: function (c) { return c.drafts; }, html: function (c) { return draftTag(c.drafts); } }] : []), st.courses, { defaultSort: { key: 'g', dir: 1 } }) + '</section>';
+
+  if (!S.showDetail) return html + detailGate('Categories and assignments');
+  var detail = S.studentDetail[sid];
+  html += '<section class="panel"><div class="panel-head"><h3>Categories and assignments</h3>' + detailToggle('missing work listed first') + '</div>';
+  if (!detail) {
+    html += '<div class="empty">Loading…</div>';
+    call('getStudentDetail', sid).then(function (d) {
+      S.studentDetail[sid] = d;
+      if (S.page && S.page.type === 'student' && S.page.id === sid) render();
+    }).catch(handleError);
+  } else {
+    html += st.courses.map(function (c) {
+      var cats = detail.categories.filter(function (x) { return x[0] === c.course; });
+      var asg = detail.assignments.filter(function (x) { return x[0] === c.course; });
+      var isMissing = function (a) { return /^(NEW|CREATED|RECLAIMED_BY_STUDENT)$/.test(a[7]) && a[5] && a[3] == null && !a[6] && a[4] > 0; };
+      asg.sort(function (a, b) { return (isMissing(b) ? 1 : 0) - (isMissing(a) ? 1 : 0) || natural(a[2], b[2]); });
+      return '<div class="course-block"><div class="course-head"><div class="card-title">' + esc(c.course) + '</div>' + coursePill(c) + '</div>' +
+        cats.map(function (x) {
+          return '<div class="cat"><div>' + esc(x[1]) + (x[2] ? ' <span class="sub">(' + x[2] + '%)</span>' : '') + '</div><div class="bar"><div style="width:' +
+            Math.max(0, Math.min(100, x[3] || 0)) + '%"></div></div><div>' + pill(x[3]) + '</div></div>';
+        }).join('') +
+        '<details' + (c.missing ? ' open' : '') + '><summary>' + asg.length + ' assignments' + (c.missing ? ', ' + c.missing + ' missing' : '') + '</summary>' +
+        '<div class="table-wrap"><table><thead><tr><th>Assignment</th><th>Category</th><th class="num">Score</th><th>Status</th></tr></thead><tbody>' +
+        asg.map(function (a) {
+          var pct = a[3] != null && a[4] ? a[3] / a[4] * 100 : null;
+          var score = a[3] != null ? a[3] + ' / ' + (a[4] != null ? a[4] : '—') : '—';
+          return '<tr><td class="wrap">' + esc(a[2]) + '</td><td>' + esc(a[1]) + '</td><td class="num">' +
+            (pct != null ? '<span class="pill ' + band(pct) + '">' + esc(score) + '</span>' : esc(score)) +
+            '</td><td>' + submissionStatus(a, isMissing(a)) + '</td></tr>';
+        }).join('') + '</tbody></table></div></details></div>';
+    }).join('');
+  }
+  return html + '</section>';
+}
+
+/** Placeholder shown instead of assignment-level detail until the viewer asks for it. */
+function detailGate(title) {
+  return '<section class="panel"><div class="panel-head"><h3>' + esc(title) + '</h3></div>' +
+    '<div class="empty">Assignment-level detail is hidden. ' +
+    '<button class="btn" data-detail="on">Show assignment details</button></div></section>';
+}
+/** Panel-head note, plus a "Hide" button for roles that start with the detail hidden. */
+function detailToggle(note) {
+  return '<span class="sub">' + esc(note) + (S.session.role === 'wellbeing'
+    ? ' · <button class="link" data-detail="off">Hide assignment details</button>' : '') + '</span>';
+}
+
+function submissionStatus(a, missing) {
+  var labels = { RETURNED: 'Returned', TURNED_IN: 'Turned in', NEW: 'Not turned in',
+                 CREATED: 'Not turned in', RECLAIMED_BY_STUDENT: 'Unsubmitted' };
+  if (missing) return '<span class="tag missing">Missing</span>';
+  var t = esc(labels[a[7]] || a[7] || '');
+  if (a[5]) t += '<span class="tag late">late</span>';
+  if (a[6]) t += '<span class="tag">excused</span>';
+  return t;
+}
+
+function renderAbout() {
+  var r = S.data.rules, I = r.intervention, A = r.attention;
+  var secs = Object.keys(S.data.sections).map(function (k) {
+    var s = S.data.sections[k];
+    return '<li><b>' + esc(k) + '</b>: ' + esc(s.semester) + ', last grade update ' + esc(s.snapshot) + '</li>';
+  }).join('');
+  return '<section class="panel rules"><h3>Where the data comes from</h3><ul>' + secs + '</ul>' +
+    '<p>Current grades are read from Google Classroom by the school\'s grades computer every day at about 3:40 PM, or when someone presses <b>Update grades</b>. ' +
+    'The IT office also saves a permanent copy (usually once a month, before grade reports); these saved grade pulls are the earlier points on the trend charts, and ' +
+    '"since last update" compares current grades with the last one. Today\'s grades are one point that is replaced by each new update, not saved. ' +
+    'The dashboard is read-only: nothing here changes Classroom. ' +
+    'Course grades follow each course\'s Classroom grading setting and are calculated the same way as the emailed grade reports, so they can be newer than the last report; ' +
+    'courses with no overall grade in Classroom show "—".</p>' +
+    '<h3>Support rules</h3>' +
+    '<p><span class="status s-int"><i></i>Needs intervention</span> if any of these is true:</p><ul>' +
+    '<li>any course below <b>' + I.courseBelow + '%</b></li><li><b>two or more</b> courses below <b>' + I.twoCoursesBelow + '%</b></li>' +
+    '<li>average of all graded courses below <b>' + I.averageBelow + '%</b></li><li><b>' + I.missingAtLeast + '</b> or more missing assignments</li></ul>' +
+    '<p><span class="status s-att"><i></i>Needs attention</span> (if not already intervention):</p><ul>' +
+    '<li>a course below <b>' + A.courseBelow + '%</b></li><li>average below <b>' + A.averageBelow + '%</b></li>' +
+    '<li><b>' + A.missingAtLeast + '</b> or more missing assignments</li>' +
+    '<li><b>Declining</b>: average fell <b>' + A.dropAtLeast + '</b> or more points since the last grade update (same courses) or compared with last semester\'s final grades</li></ul>' +
+    '<p>A course counts towards averages and flags once it has at least <b>' + r.minGraded + '</b> graded assignments; ' +
+    'until then it is marked <span class="tag">few grades</span>, because early in a semester one zero can make a course grade very low.</p>' +
+    '<p><b>Missing</b> = assigned work that is past due, not turned in, has no grade, is not excused and is worth points (Classroom\'s "Missing").</p>' +
+    '<h3>Grades and colours</h3><p>Same as the grade reports: A ≥ 85, AB ≥ 80, B ≥ 75, BC ≥ 70, C ≥ 60, D ≥ 50, F below 50. ' +
+    '<span class="pill g-good">green</span> 70 and up, <span class="pill g-warn">orange</span> above 50, <span class="pill g-bad">red</span> 50 and below.</p>' +
+    '<h3>Departments</h3><p>Each course belongs to one department, set by the dean in the Departments tab of the dashboard\'s access Sheet. ' +
+    'A department marked <span class="tag">*</span> is only a suggestion until it is confirmed there. ' +
+    'With a department picked in the filter, averages, missing work, trends and the grade distribution use only that department\'s courses, ' +
+    'and students are listed if they take at least one of them. On the Watch list, a head of department can choose <b>Flags from: &lt;department&gt; only</b>: the support rules then run on just that department\'s courses, so only students flagged because of that subject are listed (the default when a department is picked); <b>All courses</b> shows each student\'s overall status.</p>' +
+    '<p>The <b>Departments</b> tab replaces the monthly departmental spreadsheet. For each department it shows the <b>average of class averages</b> ' +
+    '(every class counts once, the spreadsheet\'s method) and the <b>average of student grades</b> (bigger classes weigh more), and each class ' +
+    'month by month with its biggest change and semester average. Earlier semesters show each class up to its last update. Classes marked ' +
+    '"leave out" (Homeroom and Other unless changed) are not included. Use "Download CSV" or "Copy for Sheets" to take the table into a spreadsheet.</p>' +
+    '<h3>Graded, not returned yet</h3><p>"Not returned" counts assignments a teacher has graded but not yet returned to students ' +
+    '(draft grades in Classroom), e.g. while a project is still being graded for the whole class. These grades are <b>not</b> in any ' +
+    'average, flag or report until the teacher returns them. Useful when talking with students or parents: there is a grade, it just ' +
+    'hasn\'t been released yet.</p>' +
+    '<h3>Past grades</h3><p>The <b>Past grades</b> tab finds any student with grades from earlier semesters, including students who have left: ' +
+    'type a name in the search box. It shows each semester\'s final grades (the last grade update of the semester, or archived Google Classroom ' +
+    'classes imported by the IT office, calculated the same way as the grade reports), each class\'s average and how far the student was above ' +
+    'or below it, and the school\'s transcript letter grades where available. Opening a student\'s past grades is recorded in the access log.</p>' +
+    '<h3>Grade distribution chart</h3><p>Shows what share of grades falls in each letter band, as a percentage, so groups and semesters of ' +
+    'different sizes can be compared. It never shows single assignments. On the Overview, choose what to count:</p><ul>' +
+    '<li><b>Student grades</b>: each student\'s current grade in each course. A student with 7 courses counts 7 times. ' +
+    'Courses with fewer than ' + r.minGraded + ' graded assignments are left out, as in the averages.</li>' +
+    '<li><b>Class averages</b>: one value per class, so you can see how classes compare.</li></ul>' +
+    '<p>The lighter bars (and the extra table columns) are last semester\'s <b>final</b> grades: for student grades, of the same students; ' +
+    'for class averages, of the classes in the same section. This semester\'s grades are still in progress, so they usually move more. ' +
+    '<b>Bars</b> and <b>Proportions</b> (a ring chart) show the same numbers; "Show numbers" lists them with counts.</p>' +
+    '<h3>Privacy</h3><p>You see only the courses assigned to you by the dashboard owner' + (S.session.isAll ? ' (your account sees all courses)' : '') +
+    '. Each visit is recorded. Please do not share screenshots or the access code; the page locks after ' + IDLE_MINUTES + ' minutes without activity.</p></section>';
+}
+
+function noData(msg) {
+  return '<div class="msg">' + esc(msg || (S.data && S.data.rows.length ? 'No students match these filters.'
+    : 'No courses are assigned to your account yet. Please ask the dashboard owner.')) + '</div>';
+}
+
+/* =====================================================================
+   Navigation and events
+   ===================================================================== */
+function openPage(type, id) {
+  if (S.page) S.back.push(S.page);
+  S.page = { type: type, id: id };
+  render(); window.scrollTo(0, 0);
+}
+function goTab(tab) { if (tab === 'past' && S.tab === 'past') S.pastSid = null; S.tab = tab; S.page = null; S.back = []; render(); window.scrollTo(0, 0); }
+
+$('tabs').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-tab]');
+  if (b) goTab(b.getAttribute('data-tab'));
+});
+$('view').addEventListener('click', function (e) {
+  var el = e.target.closest('[data-course],[data-student],[data-back],[data-sort],[data-watch],[data-group],[data-grade],[data-homeroom],[data-detail],[data-dist-mode],[data-dist-unit],[data-dept],[data-dsem],[data-dcols],[data-dcombine],[data-flagscope],[data-export],[data-pastsid],[data-pastback]');
+  if (!el) return;
+  if (el.hasAttribute('data-pastsid')) { S.pastSid = el.getAttribute('data-pastsid'); S.tab = 'past'; S.page = null; S.back = []; render(); window.scrollTo(0, 0); return; }
+  if (el.hasAttribute('data-pastback')) { S.pastSid = null; render(); return; }
+  if (el.hasAttribute('data-dsem')) { S.deptSem = el.getAttribute('data-dsem'); render(); return; }
+  if (el.hasAttribute('data-dcols')) { S.deptCols = el.getAttribute('data-dcols'); savePref('deptCols', S.deptCols); render(); return; }
+  if (el.hasAttribute('data-flagscope')) { S.flagScope = el.getAttribute('data-flagscope'); savePref('flagScope', S.flagScope); render(); return; }
+  if (el.hasAttribute('data-dcombine')) { S.deptCombine = el.getAttribute('data-dcombine') === 'yes'; savePref('deptCombine', S.deptCombine ? 'yes' : 'no'); render(); return; }
+  if (el.hasAttribute('data-export')) { exportDept(el.getAttribute('data-export'), el); return; }
+  if (el.hasAttribute('data-dept')) { openPage('dept', el.getAttribute('data-dept')); return; }
+  if (el.hasAttribute('data-dist-mode')) { S.distMode = el.getAttribute('data-dist-mode'); savePref('distMode', S.distMode); render(); return; }
+  if (el.hasAttribute('data-dist-unit')) { S.distUnit = el.getAttribute('data-dist-unit'); savePref('distUnit', S.distUnit); render(); return; }
+  if (el.hasAttribute('data-detail')) { S.showDetail = el.getAttribute('data-detail') === 'on'; render(); return; }
+  if (el.hasAttribute('data-back')) { S.page = S.back.pop() || null; render(); return; }
+  if (el.hasAttribute('data-sort')) {
+    var id = el.closest('table').getAttribute('data-table'), k = el.getAttribute('data-sort');
+    var cur = S.sort[id];
+    S.sort[id] = { key: k, dir: cur && cur.key === k ? -cur.dir : (el.getAttribute('data-num') === '1' ? -1 : 1) };
+    render(); return;
+  }
+  if (el.hasAttribute('data-watch')) { S.watchFilter = el.getAttribute('data-watch'); goTab('watch'); return; }
+  if (el.hasAttribute('data-group')) { S.groupBy = el.getAttribute('data-group'); render(); return; }
+  if (el.hasAttribute('data-grade')) { $('f-grade').value = el.getAttribute('data-grade'); refreshFilterOptions(); goTab('students'); return; }
+  if (el.hasAttribute('data-homeroom')) { $('f-homeroom').value = el.getAttribute('data-homeroom'); goTab('students'); return; }
+  if (el.hasAttribute('data-student')) openPage('student', el.getAttribute('data-student'));
+  else openPage('course', el.getAttribute('data-course'));
+});
+$('search').addEventListener('input', function () {
+  if (S.page) { S.page = null; S.back = []; }
+  if (S.tab === 'overview' || S.tab === 'about') S.tab = 'students';
+  if (S.tab === 'past') S.pastSid = null;   // the search box finds past students on the Past grades tab
+  render();
+});
+['f-section', 'f-grade', 'f-homeroom', 'f-dept'].forEach(function (id) {
+  $(id).addEventListener('change', function () { refreshFilterOptions(); if (S.page) { S.page = null; S.back = []; } render(); });
+});
+
+/* Light / dark switch. Remembered per browser (only this preference); until someone uses it, the page
+   follows the computer's setting. Charts use the same colour variables, so they change with it. */
+function currentTheme() {
+  var chosen = document.documentElement.getAttribute('data-theme');
+  if (chosen) return chosen;
+  return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function showThemeButton() {
+  var next = currentTheme() === 'dark' ? 'light' : 'dark';
+  var b = $('theme-btn');
+  b.textContent = next === 'dark' ? '☾ Dark mode' : '☀ Light mode';
+  b.title = 'Switch to ' + next + ' mode';
+}
+$('theme-btn').addEventListener('click', function () {
+  var next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  savePref('theme', next);
+  showThemeButton();
+});
+if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', showThemeButton);
+showThemeButton();
+// Printing always uses light colours.
+var themeBeforePrint = null;
+window.addEventListener('beforeprint', function () {
+  themeBeforePrint = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', 'light');
+});
+window.addEventListener('afterprint', function () {
+  if (themeBeforePrint) document.documentElement.setAttribute('data-theme', themeBeforePrint);
+  else document.documentElement.removeAttribute('data-theme');
+});
+
+function showDataDates() {
+  var d = S.data;
+  $('meta').textContent = Object.keys(d.sections).map(function (k) {
+    return k + ': ' + d.sections[k].semester + ', updated ' + d.sections[k].snapshot;
+  }).join(' · ') || 'No data yet';
+}
+
+/* =====================================================================
+   "Update grades": asks the grades computer to pull from Classroom
+   ===================================================================== */
+var U = { timer: null, id: null, askedAt: 0, last: null, waiting: false, loading: false };
+var UPDATE_POLL_MS = 5000;
+var UPDATE_PICKUP_MS = 180000;   // the computer checks every 30 seconds, so this means it isn't answering
+
+function openUpdateDialog() {
+  var dlg = $('update-dialog');
+  if (!dlg.open) dlg.showModal();
+  pollUpdate();
+}
+function stopUpdatePolling() { clearTimeout(U.timer); U.timer = null; }
+function scheduleUpdatePoll() { clearTimeout(U.timer); U.timer = setTimeout(pollUpdate, UPDATE_POLL_MS); }
+
+function pollUpdate() {
+  if (!S.code) return stopUpdatePolling();
+  call('getRefreshStatus').then(function (st) {
+    if (!S.code) return;
+    U.last = st;
+    showUpdateState(st);
+    var theirRunFinished = U.waiting && st.state !== 'running' &&
+      (st.requestId === U.id || (st.finishedAt && st.finishedAt > U.askedAt));
+    if (theirRunFinished) return updateFinished(st);
+    if (U.waiting && st.state !== 'running' && Date.now() - U.askedAt > UPDATE_PICKUP_MS) {
+      U.waiting = false;
+      setUpdateStage('The grades computer did not answer, so nothing was updated. It may have just gone to sleep.', true);
+      stopUpdatePolling();
+      return showUpdateButton();
+    }
+    if (st.state === 'running' && !U.waiting) { U.waiting = true; U.id = st.requestId; U.askedAt = st.startedAt; }
+    if (U.waiting || $('update-dialog').open) scheduleUpdatePoll(); else stopUpdatePolling();
+    showUpdateButton();
+  }).catch(function (err) {
+    var msg = (err && err.message) || String(err);
+    if (msg.indexOf('ACCESS_CODE:') !== -1) return handleError(err);
+    setUpdateStage('Could not check the update: ' + msg, true);
+    if (U.waiting || $('update-dialog').open) scheduleUpdatePoll();
+  });
+}
+
+function setUpdateStage(text, isError) {
+  var el = $('up-stage');
+  el.textContent = text;
+  el.className = 'up-stage' + (isError ? ' error' : '');
+}
+
+function showUpdateState(st) {
+  var computer = $('up-computer');
+  var running = st.state === 'running';
+  computer.className = 'up-computer ' + (st.computerOn ? 'on' : 'off');
+  computer.innerHTML = '<i></i>' + esc(!st.available ? 'The update service is not set up on the grades computer yet.'
+    : st.computerOn ? 'The grades computer is on.'
+    : 'The grades computer appears to be off or asleep' + (st.lastSeen ? ' (last seen ' + st.lastSeen + ')' : '') + '.');
+  var waitingToStart = U.waiting && !running;
+  $('up-bar').style.width = (running ? st.pct : waitingToStart ? 1 : st.state === 'done' ? 100 : 0) + '%';
+  if ($('up-log').value !== st.log.join('\n')) {
+    $('up-log').value = st.log.join('\n');
+    $('up-log').scrollTop = $('up-log').scrollHeight;
+  }
+  if (running) setUpdateStage(st.pct + '%: ' + st.stage + '…');
+  else if (waitingToStart) setUpdateStage('Waiting for the grades computer to start (up to a minute)…');
+  else if (st.message) setUpdateStage((st.state === 'done' && st.finishedAt ? 'Last update: ' : '') + st.message, st.state === 'error');
+  else setUpdateStage('');
+  var start = $('up-start');
+  start.disabled = running || waitingToStart || !st.available || !st.computerOn || st.cooldownMinutes > 0;
+  start.textContent = running || waitingToStart ? 'Updating…' : 'Update now';
+  start.title = running || waitingToStart ? 'An update is running'
+    : !st.computerOn ? 'The grades computer appears to be off or asleep'
+    : st.cooldownMinutes ? 'The grades were just updated. Try again in about ' + st.cooldownMinutes + ' minute(s).'
+    : 'Ask the grades computer to update the dashboard now';
+}
+
+function showUpdateButton() {
+  var b = $('update-btn');
+  if (!b) return;
+  var st = U.last;
+  b.textContent = U.loading ? 'Loading new grades…' : U.waiting ? 'Updating… ' + (st && st.state === 'running' ? st.pct + '%' : '') : 'Update grades';
+}
+
+function startUpdate() {
+  $('up-start').disabled = true;
+  setUpdateStage('Asking the grades computer…');
+  call('requestRefresh').then(function (res) {
+    if (!S.code) return;
+    if (!res.ok) { setUpdateStage(res.reason, true); return pollUpdate(); }
+    U.waiting = true; U.id = res.id; U.askedAt = Date.now() - 5000;
+    showUpdateButton();
+    pollUpdate();
+  }).catch(handleError);
+}
+
+/** The computer finished: load the new grades into this page without losing the viewer's place. */
+function updateFinished(st) {
+  U.waiting = false;
+  stopUpdatePolling();
+  showUpdateState(st);
+  if (st.state !== 'done') return showUpdateButton();
+  U.loading = true;
+  showUpdateButton();
+  setUpdateStage('Loading the new grades into this page…');
+  call('getDashboardData').then(function (data) {
+    U.loading = false;
+    if (!S.code) return;
+    S.data = data; S.courseDetail = {}; S.studentDetail = {};
+    prepare(data);
+    showDataDates();
+    render();
+    showUpdateButton();
+    setUpdateStage(st.message + ' This page now shows the new grades.');
+    if ($('update-dialog').open) { scheduleUpdatePoll(); }
+  }).catch(handleError);
+}
+
+$('up-close').addEventListener('click', function () { $('update-dialog').close(); });
+$('up-start').addEventListener('click', startUpdate);
+$('update-dialog').addEventListener('close', function () { if (!U.waiting) stopUpdatePolling(); });
+
+function startApp() {
+  var d = S.data, sess = S.session;
+  var roleNames = { teacher: 'Teacher', dean: 'Dean', wellbeing: 'Well-being team', admin: 'Admin' };
+  showDataDates();
+  $('who').innerHTML = '<span class="sub">' + esc(sess.user) + ' · ' + esc(roleNames[sess.role] || sess.role) + '</span>' +
+    '<button class="btn" id="update-btn" title="Read the latest grades from Google Classroom using the school\'s grades computer. ' +
+    'Takes about 10 minutes and only works while that computer is on. Click for details.">Update grades</button>' +
+    '<button class="btn" id="lock-btn" title="Hide the grades until the code is entered again">Lock</button>';
+  $('lock-btn').addEventListener('click', function () { lock(); });
+  $('update-btn').addEventListener('click', openUpdateDialog);
+  if (U.timer) showUpdateButton();
+  $('tabs').hidden = false; $('toolbar').hidden = false;
+  fillSelect('f-section', uniq(S.studentList.map(function (s) { return s.section; })).sort(natural));
+  $('f-section').hidden = $('f-section').options.length <= 2;
+  refreshFilterOptions();
+  S.tab = sess.role === 'teacher' ? 'overview' : 'watch';
+  S.showDetail = sess.role !== 'wellbeing';
+  S.page = null; S.back = [];
+  resetIdle();
+  render();
+}
+
+/* =====================================================================
+   Start
+   ===================================================================== */
+(function () {
+  var saved = storedCode();
+  if (saved) unlockWith(saved); else lock();
+})();
+</script>
+</body>
+</html>
